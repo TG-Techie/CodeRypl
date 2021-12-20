@@ -109,6 +109,7 @@ class MainWindow(QMainWindow):
         is_tab = event.key() == Qt.Key_Tab
         is_backtab = event.key() == Qt.Key_Backtab
         is_delete = event.key() == Qt.Key_Delete or event.key() == Qt.Key_Backspace
+        is_escape = event.key() == Qt.Key_Escape
 
         with_shift = event.modifiers() & Qt.ShiftModifier
         with_control = event.modifiers() & Qt.MetaModifier
@@ -123,8 +124,13 @@ class MainWindow(QMainWindow):
         #     f"{is_enter=}, {is_tab=}, {is_backtab=}, {with_shift=}, {with_control=}, "
         #     f"{with_option=}, {at_bottom=}, {row_empty=}, {self._skip_next_row_forward=}, {cell_empty=}"
         # )
-        if is_delete and with_shift:
-            raise NotImplementedError("shift delete not implemented")
+
+        # TODO: cmd-z and m=cmd-sft-z
+        if is_delete:
+            self.model.set_rplm_field(index.row(), index.column(), "")
+            self.model.refresh()
+            return True
+        elif is_delete and with_shift:
             self.remove_row(index.row())
             return True
         elif is_tab and at_bottom and at_right:
@@ -134,9 +140,13 @@ class MainWindow(QMainWindow):
                 self.insert_below()
             return True
         if is_tab and at_right:
-            self.insert_below()
+            if row_empty:
+                self.go_col(0)
+            else:
+                self.go(index.row() + 1, 0)
             return True
         elif is_tab and DISABLE_TAB_WRAP:
+            print("asdf")
             self.move_right()
             return True
         elif is_backtab and DISABLE_TAB_WRAP:
@@ -174,7 +184,15 @@ class MainWindow(QMainWindow):
 
         else:
             if is_tab or is_enter or is_backtab:
+                import time
+
+                print()
+                print(time.monotonic(), "unhandled keypress", event.key())
                 print("fall thorught")
+                print(
+                    f"{is_enter=}, {is_tab=}, {is_backtab=}, {with_shift=}, {with_control=}, "
+                    f"{with_option=}, {at_bottom=}, {row_empty=}, {self._skip_next_row_forward=}, {cell_empty=}"
+                )
             return False
 
         # This should be unreachable (also grayed out with pylance)
@@ -232,11 +250,15 @@ class MainWindow(QMainWindow):
     # table navigation methods
     def move_right(self):
         index = self.table.currentIndex()
-        self.table.setCurrentIndex(index.siblingAtColumn((index.column() + 1) % 4))
+        self.table.setCurrentIndex(
+            index.siblingAtColumn((index.column() + 1) % Rplm.NUM_COLS)
+        )
 
     def move_left(self):
         index = self.table.currentIndex()
-        self.table.setCurrentIndex(index.siblingAtColumn((index.column() - 1) % 4))
+        self.table.setCurrentIndex(
+            index.siblingAtColumn((index.column() - 1) % Rplm.NUM_COLS)
+        )
 
     # def _move_to_first_row(self, index: QModelIndex):
     #     self.table.setCurrentIndex(index.siblingAtRow(0))
@@ -259,6 +281,16 @@ class MainWindow(QMainWindow):
     def go_col(self, col: int):
         index = self.table.currentIndex()
         self.table.setCurrentIndex(index.siblingAtColumn(col))
+
+    def go(self, row: int, col: int):
+        index = self.table.currentIndex()
+        self.table.setCurrentIndex(
+            index.sibling(row % len(self.model), col % Rplm.NUM_COLS)
+        )
+
+    def remove_row(self, row: int):
+        self.model.pop(row)
+        self.go_col(0)
 
 
 if __name__ == "__main__":

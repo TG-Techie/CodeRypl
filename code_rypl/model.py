@@ -37,6 +37,8 @@ class Rplm:  # replacement model
     num: str
     posn: str
 
+    NUM_COLS = 4
+
     # uuid: UUID = field(default_factory=uuid4, repr=False)
 
     def isempty(self) -> bool:
@@ -170,12 +172,22 @@ class RplmFileModel(QAbstractTableModel):
 
     def append(self, rplm: Rplm):
         self._data.append(rplm)
-        self.layoutChanged.emit()
+        self.refresh()
         # self.set_selected_row(self._last_used_index.siblingAtRow(len(self._data) - 1))
 
     def insert(self, row: int, rplm: Rplm) -> None:
         self._data.insert(row, rplm)
+        self.refresh()
+    
+    def refresh(self) -> None:
         self.layoutChanged.emit()
+
+    def pop(self, row: int) -> Rplm:
+        item = self._data.pop(row)
+        if len(self._data) == 0:
+            self.append(Rplm.empty())
+        self.refresh()
+        return item
 
     def flags(self, index):
         # rplm = self._data[index.row()]
@@ -216,7 +228,7 @@ class RplmFileModel(QAbstractTableModel):
             self.set_rplm_field(*src_pos, dest_value)
 
             # update the table
-            self.layoutChanged.emit()
+            self.refresh()
 
             # keep focus on the dragged item (feels a bit more natural)
             self.set_selected_cell(parent)
