@@ -42,6 +42,10 @@ from PySide6.QtWidgets import (
 ENABLE_STAY_ON_INSERT_ABOVE = not (
     {"--disable-stay-on-above-insert", "-dis-soai"} & set(sys.argv)
 )
+ENABLE_MOVE_TO_FIRST_ON_INSERT = not (
+    {"--disable-move-to-first-on-insert", "-dis-mtfoi"} & set(sys.argv)
+)
+ENABLE_TAB_WRAP = bool({"--enable-tab-wrap", "-en-tw"} & set(sys.argv))
 
 
 @dataclass(repr=True, frozen=False)
@@ -177,7 +181,7 @@ class RplmFileModel(QAbstractTableModel):
                 value if len(value) else self._blank_field_text_from_col[index.column()]
             )
 
-        elif role == Qt.ForegroundRole:
+        elif roleasdf  == Qt.ForegroundRole:
             return None if len(value) else QtGui.QColor("gray")
 
         return None
@@ -335,7 +339,7 @@ class MainWindow(QMainWindow):
 
         # input sanitation
         if not index.isValid() or event.type() != QEvent.KeyPress:
-            return True
+            return False
 
         is_enter = event.key() == Qt.Key_Enter or event.key() == Qt.Key_Return
         is_tab = event.key() == Qt.Key_Tab
@@ -346,39 +350,49 @@ class MainWindow(QMainWindow):
         with_option = event.modifiers() & Qt.AltModifier
 
         at_bottom = index.row() == len(self.model) - 1
+        at_right = index.column() == 3
         row_empty = self.model.get_rplm(index.row()).isempty()
+        cell_empty = self.model.get_rplm_field(index.row(), index.column()) == ""
 
-        # print(
-        #     f"{is_enter=}, {is_tab=}, {is_backtab=}, {with_shift=}, {with_control=}, "
-        #     f"{with_option=}, {at_bottom=}, {row_empty=}, {self._skip_next_row_forward=}"
-        # )
+        print(
+            f"{is_enter=}, {is_tab=}, {is_backtab=}, {with_shift=}, {with_control=}, "
+            f"{with_option=}, {at_bottom=}, {row_empty=}, {self._skip_next_row_forward=}, {cell_empty=}"
+        )
 
-        if is_tab:
-            self._move_col_forward_no_wrap(index)
+        if is_tab and ENABLE_TAB_WRAP:
+            self.move_right(index)
             return True
-        elif is_backtab:
-            self._move_col_backward_no_wrap(index)
+        elif is_backtab and ENABLE_TAB_WRAP:
+            self.move_left(index)
             return True
         elif is_enter:
             if with_shift and with_option:
-                self.model.insert(index.row(), Rplm.empty())
-                self._skip_next_row_forward = True and ENABLE_STAY_ON_INSERT_ABOVE
+                self.insert_above()
                 return False
+            if with_shift:
+                self.move_up(index)
+                return True
             if with_option:
-                self.model.insert(index.row() + 1, Rplm.empty())
-                self._move_row_forward_one(index)
+                self.insert_below()
+                return True
+            if at_bottom and at_right:
+                if row_empty:
+                    self.go_col(0)
+                else:
+                    self.insert_below()
+                return True
+            if at_right:
+                self.move_down()
+                self.go_col(0)
                 return True
             if row_empty and at_bottom:
-                return True
-            if with_shift:
-                self._move_row_backward_one(index)
                 return True
             else:
                 # this gate prenet an enter down after an insert into a row above
                 if self._skip_next_row_forward and ENABLE_STAY_ON_INSERT_ABOVE:
                     self._skip_next_row_forward = False
                 else:
-                    self._move_row_forward_one(index)
+                    self.move_down()
                 return True
 
         else:
@@ -392,7 +406,7 @@ class MainWindow(QMainWindow):
         self.header_layout = header_layout = QHBoxLayout()
         # create the open and export buttons and labels
         self.open_button = open_button = QPushButton("Open")
-        self.filename_input = filename_input = QTextEdit(self.model.filename)
+        self.filename_input = filename_input = QLineEdit(self.model.filename)
         self.export_button = export_button = QPushButton("Export")
 
         # make the label fill the space between the buttons
@@ -401,12 +415,12 @@ class MainWindow(QMainWindow):
             QSizePolicy.MinimumExpanding, QSizePolicy.Preferred
         )
         filename_input.setAlignment(QtCore.Qt.AlignCenter)
-        filename_input.setFixedHeight(
-            QtGui.QFontMetrics(filename_input.font()).height() + 10
-        )
+        # filename_input.setFixedHeight(
+        #     QtGui.QFontMetrics(filename_input.font()).height() + 10
+        # )
         # make the filename_input double clickable to edit
         filename_input.setReadOnly(False)
-        filename_input.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        # filename_input.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
         # add the buttons  and current lable to the horizontal layout
         header_layout.addWidget(open_button)
@@ -415,11 +429,35 @@ class MainWindow(QMainWindow):
 
         return header_layout
 
+    def insert_above(self) -> None:
+
+        index = self.table.currentIndex()
+
+        self.model.insert(index.row(), Rplm.empty())
+        self._skip_next_row_forward = True and ENABLE_STAY_ON_INSERT_ABOVE
+
+        if ENABLE_MOVE_TO_FIRST_ON_INSERT:
+            self.table.setCurrentIndex(index.siblingAtColumn(0))
+
+    def insert_below(self) -> None:
+
+        index = self.table.currentIndex()
+
+        self.model.insert(index.row() + 1, Rplm.empty())
+        self.table.setCurrentIndex(
+            index.sibling(
+                (index.row() + 1) % len(self.model),
+                0 if ENABLE_MOVE_TO_FIRST_ON_INSERT else index.column(),
+            )
+        )
+
     # table navigation methods
-    def _move_col_forward_no_wrap(self, index: QModelIndex):
+    def move_right(self):
+        index = self.table.currentIndex()
         self.table.setCurrentIndex(index.siblingAtColumn((index.column() + 1) % 4))
 
-    def _move_col_backward_no_wrap(self, index: QModelIndex):
+    def move_left(self):
+        index = self.table.currentIndex()
         self.table.setCurrentIndex(index.siblingAtColumn((index.column() - 1) % 4))
 
     # def _move_to_first_row(self, index: QModelIndex):
@@ -428,15 +466,21 @@ class MainWindow(QMainWindow):
     # def _move_to_last_row(self, index: QModelIndex):
     #     self.table.rrentIndex(index.siblingAtRow(len(self.model) - 1))
 
-    def _move_row_forward_one(self, index: QModelIndex):
+    def move_down(self):
+        index = self.table.currentIndex()
         self.table.setCurrentIndex(
             index.siblingAtRow((index.row() + 1) % len(self.model))
         )
 
-    def _move_row_backward_one(self, index: QModelIndex):
+    def move_up(self):
+        index = self.table.currentIndex()
         self.table.setCurrentIndex(
             index.siblingAtRow((index.row() - 1) % len(self.model))
         )
+
+    def go_col(self, col: int):
+        index = self.table.currentIndex()
+        self.table.setCurrentIndex(index.siblingAtColumn(col))
 
 
 if __name__ == "__main__":
