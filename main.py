@@ -181,7 +181,7 @@ class RplmFileModel(QAbstractTableModel):
                 value if len(value) else self._blank_field_text_from_col[index.column()]
             )
 
-        elif roleasdf  == Qt.ForegroundRole:
+        elif role == Qt.ForegroundRole:
             return None if len(value) else QtGui.QColor("gray")
 
         return None
