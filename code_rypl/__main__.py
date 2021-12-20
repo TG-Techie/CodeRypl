@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import os
 
 from typing import *
 from dataclasses import dataclass, field
@@ -46,9 +47,11 @@ print(f"{DISABLE_TAB_WRAP=}")
 
 from model import *
 
-
-class MainWindow(QMainWindow):
+# maybe name this code ryple document?
+class CodeRyplWindow(QMainWindow):
     def __init__(self):
+        # TODO: make this take a filename as an argument and open it
+        # or none for an untitled one
         super().__init__()
 
         self.setFixedSize(720, 450)
@@ -76,6 +79,33 @@ class MainWindow(QMainWindow):
         base_layout.addWidget(table)
 
         # self.setCentralWidget(table)
+
+    def _make_header(self) -> QHBoxLayout:
+        self.header_layout = header_layout = QHBoxLayout()
+        # create the open and export buttons and labels
+        self.open_button = open_button = QPushButton("Open")
+        self.filename_input = filename_input = QLineEdit(self.model.filename)
+        self.export_button = export_button = QPushButton("Export")
+
+        # make the label fill the space between the buttons
+        # and center the text in the label
+        filename_input.setSizePolicy(
+            QSizePolicy.MinimumExpanding, QSizePolicy.Preferred
+        )
+        filename_input.setAlignment(QtCore.Qt.AlignCenter)
+        # filename_input.setFixedHeight(
+        #     QtGui.QFontMetrics(filename_input.font()).height() + 10
+        # )
+        # make the filename_input double clickable to edit
+        filename_input.setReadOnly(False)
+        # filename_input.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
+        # add the buttons  and current lable to the horizontal layout
+        header_layout.addWidget(open_button)
+        header_layout.addWidget(filename_input)
+        header_layout.addWidget(export_button)
+
+        return header_layout
 
     def _make_table(self) -> QTableView:
         table = QTableView()
@@ -198,33 +228,6 @@ class MainWindow(QMainWindow):
         # This should be unreachable (also grayed out with pylance)
         assert False, "unreachable"
 
-    def _make_header(self) -> QHBoxLayout:
-        self.header_layout = header_layout = QHBoxLayout()
-        # create the open and export buttons and labels
-        self.open_button = open_button = QPushButton("Open")
-        self.filename_input = filename_input = QLineEdit(self.model.filename)
-        self.export_button = export_button = QPushButton("Export")
-
-        # make the label fill the space between the buttons
-        # and center the text in the label
-        filename_input.setSizePolicy(
-            QSizePolicy.MinimumExpanding, QSizePolicy.Preferred
-        )
-        filename_input.setAlignment(QtCore.Qt.AlignCenter)
-        # filename_input.setFixedHeight(
-        #     QtGui.QFontMetrics(filename_input.font()).height() + 10
-        # )
-        # make the filename_input double clickable to edit
-        filename_input.setReadOnly(False)
-        # filename_input.setTextInteractionFlags(Qt.TextSelectableByMouse)
-
-        # add the buttons  and current lable to the horizontal layout
-        header_layout.addWidget(open_button)
-        header_layout.addWidget(filename_input)
-        header_layout.addWidget(export_button)
-
-        return header_layout
-
     def insert_above(self) -> None:
 
         index = self.table.currentIndex()
@@ -293,9 +296,36 @@ class MainWindow(QMainWindow):
         self.go_col(0)
 
 
+class CodeRyplApplication(QApplication):
+    def __init__(self, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        self._windows: list[CodeRyplWindow] = []
+        # # the below commented code was auto-suggested by copilot
+        # self.setStyle("Fusion")
+        # self.setStyleSheet(
+        #     open(
+        #         os.path.join(os.path.dirname(__file__), "..", "styles", "fusion.qss"),
+        #         "r",
+        #     ).read()
+        # )
+
+    def new_window(self):
+        window = CodeRyplWindow()
+        self._windows.append(window)
+        window.show()
+        return window
+
+
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
+    app = CodeRyplApplication(sys.argv)
+    window = app.new_window()
+
+    # window = CodeRyplWindow()
+    # window.show()
+
+    # window2 = CodeRyplWindow()
+    # window2.show()
 
     sys.exit(app.exec())
