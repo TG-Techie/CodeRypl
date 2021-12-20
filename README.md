@@ -1,11 +1,9 @@
 # CodeRypl
 A code-replacements graphical user interface to make editing replacements quick and easy
 
-# does it need back end to export them?
-> Yes
-
 # todo:
-- make the RplmFileModel handle file io
+- add a backend to generate the exported file
+- make the RplmFileModel class handle file io (excluding export)
 - move the Table and event filer into it's own class to better segment the program
 - add a way to enter the metadata? (school etc)
 - save as a file outside of exporting to the text format
