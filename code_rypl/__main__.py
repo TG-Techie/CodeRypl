@@ -92,7 +92,7 @@ class CodeRyplWindow(QMainWindow):
         filename_input.setSizePolicy(
             QSizePolicy.MinimumExpanding, QSizePolicy.Preferred
         )
-        filename_input.setAlignment(QtCore.Qt.AlignCenter)
+        filename_input.setAlignment(Qt.AlignCenter)  # type: ignore
         # filename_input.setFixedHeight(
         #     QtGui.QFontMetrics(filename_input.font()).height() + 10
         # )
