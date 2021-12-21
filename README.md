@@ -14,5 +14,5 @@ A code-replacements graphical user interface to make editing replacements quick 
     - There is some discussion to be had over if .rplm files should be a thing
     - it means opening a file doesn't need to parse code replacements but can just load the interal represention
     - it also mean it could export to several format
-    - If that funcationality is want it could be performed with a different 
+    - If that funcationality is desired it could be performed with a different button/function
  
