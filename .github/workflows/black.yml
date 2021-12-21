@@ -1,4 +1,4 @@
-name: Pylint
+name: CodeRyplStyle
 
 on: [push, pull_request]
 
@@ -9,15 +9,18 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install black
-    - name: Analysing the code with black
-      run: |
-        black --target-version py310 `ls -R|grep .py$|xargs`
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install black
+      - name: Checking format with black
+        run: |
+          black --check --target-version py310 **/*.p
+      - name: Checking typing with mypy
+        run: |
+          mypy --show-traceback **/*.py

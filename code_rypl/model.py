@@ -14,13 +14,14 @@ from PySide6.QtCore import (
     QMimeData,
 )
 
+from PySide6.QtWidgets import (
+    QMessageBox,
+)
 
-def error_dialog():
-    msgbox = QtWidgets.QMessageBox()
-    msgbox.setText(
-        f"Can only drag one item at a time, not {len(indicies)}.\n"
-        "(If you're Ryan reading this message, what would that even do?)"
-    )
+
+def error_popup(message):
+    msgbox = QMessageBox()
+    msgbox.setText(message)
     msgbox.exec()
 
 
@@ -49,26 +50,29 @@ class Rplm:  # replacement model
         return cls("", "", "", "")
 
     def _get_field_by_col(self, col: int) -> str:
-        match col:
-            # fmt: off
-            case 0: return self.first
-            case 1: return self.last
-            case 2: return self.num
-            case 3: return self.posn
-            # fmt: on
-            case _:
-                raise ValueError(f"{self}._get_field_by_col({col})")
+        # match col:
+        if col == 0:
+            return self.first
+        if col == 1:
+            return self.last
+        if col == 2:
+            return self.num
+        if col == 3:
+            return self.posn
+        else:
+            raise ValueError(f"{self}._get_field_by_col({col})")
 
     def _set_field_by_col(self, col: int, value: str) -> None:
-        match col:
-            # fmt: off
-            case 0: self.first = value
-            case 1: self.last = value
-            case 2: self.num = value
-            case 3: self.posn = value
-            # fmt: on
-            case _:
-                raise ValueError(f"{self}._set_field_by_col({col})")
+        if col == 0:
+            self.first = value
+        if col == 1:
+            self.last = value
+        if col == 2:
+            self.num = value
+        if col == 3:
+            self.posn = value
+        else:
+            raise ValueError(f"{self}._set_field_by_col({col})")
 
 
 class RplmFileModel(QAbstractTableModel):
@@ -90,7 +94,7 @@ class RplmFileModel(QAbstractTableModel):
 
     def __init__(self, name: str, data: Iterable[Rplm]) -> None:
         super().__init__()
-        self._data = data
+        self._data = list(data)
         self._filename = name
         self._last_used_index = QModelIndex()
         self.set_selected_cell: Callable[[QModelIndex], None] = lambda _: None
@@ -107,7 +111,7 @@ class RplmFileModel(QAbstractTableModel):
         raise NotImplementedError(
             f"fromfile not implemented for {cls.__name__}.open({filename})"
         )
-        return cls(data)
+        # return cls(data)
 
     @classmethod
     def untitled(cls) -> RplmFileModel:
@@ -123,7 +127,7 @@ class RplmFileModel(QAbstractTableModel):
     def columnCount(self, index):
         return 4
 
-    def data(self, index: QtCore.QModelIndex, role: QtCore.Qt.ItemDataRole):
+    def data(self, index: QModelIndex, role: Qt.ItemDataRole):  # type: ignore
 
         if not index.isValid():
             return None
@@ -146,12 +150,11 @@ class RplmFileModel(QAbstractTableModel):
     def setData(self, index, value, role):
 
         self._last_used_index = index
-        match role:
-            case Qt.EditRole:
-                self.set_rplm_field(index.row(), index.column(), value)
-                return True
-            case _:
-                raise ValueError(f"{self}.setData({index=}, {value=}, {role=})")
+        if role == Qt.EditRole:
+            self.set_rplm_field(index.row(), index.column(), value)
+            return True
+        else:
+            raise ValueError(f"{self}.setData({index=}, {value=}, {role=})")
 
     def get_rplm_field(self, row: int, col: int) -> str:
         return self._data[row]._get_field_by_col(col)
@@ -178,7 +181,7 @@ class RplmFileModel(QAbstractTableModel):
     def insert(self, row: int, rplm: Rplm) -> None:
         self._data.insert(row, rplm)
         self.refresh()
-    
+
     def refresh(self) -> None:
         self.layoutChanged.emit()
 
@@ -200,15 +203,25 @@ class RplmFileModel(QAbstractTableModel):
             | Qt.ItemIsDropEnabled
         )
 
-    def mimeData(self, indicies: list[QModelIndex]) -> Rplm:
+    def mimeData(self, indicies: list[QModelIndex]) -> QMimeData:  # type: ignore
         self._drop_sources = indicies
 
         if len(indicies) != 1:
-            error_dialog()
+            error_popup(
+                f"Can only drag one item at a time, not {len(indicies)}.\n"
+                "(If you're Ryan reading this message, what would that even do?)"
+            )
 
-        data = super().mimeData(indicies)
-        data.setData("application/rplm-row", QByteArray(str(indicies[0].row())))
-        data.setData("application/rplm-col", QByteArray(str(indicies[0].column())))
+        data = super().mimeData(indicies)  # type: ignore
+
+        data.setData(
+            "application/rplm-row",
+            QByteArray((str(indicies[0].row())).encode()),
+        )
+        data.setData(
+            "application/rplm-col",
+            QByteArray((str(indicies[0].column())).encode()),
+        )
         return data
 
     def dropMimeData(self, data: QMimeData, action, _r, _c, parent):
