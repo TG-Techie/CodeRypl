@@ -1,4 +1,8 @@
 # CodeRypl
+
+[![black](https://github.com/TG-Techie/CodeRypl/actions/workflows/black.yml/badge.svg)](https://github.com/TG-Techie/CodeRypl/actions/workflows/black.yml)
+[![mypy](https://github.com/TG-Techie/CodeRypl/actions/workflows/mypy.yml/badge.svg)](https://github.com/TG-Techie/CodeRypl/actions/workflows/mypy.yml)
+
 A code-replacements graphical user interface to make editing replacements quick and easy
 
 # todo:
