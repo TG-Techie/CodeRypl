@@ -38,9 +38,11 @@ from PySide6.QtWidgets import (
 ENABLE_STAY_ON_INSERT_ABOVE = not (
     {"--disable-stay-on-above-insert", "-dis-soai"} & set(sys.argv)
 )
+
 ENABLE_MOVE_TO_FIRST_ON_INSERT = not (
     {"--disable-move-to-first-on-insert", "-dis-mtfoi"} & set(sys.argv)
 )
+
 DISABLE_TAB_WRAP = bool({"--disable-tab-wrap", "-dis-tw"} & set(sys.argv))
 
 print(f"{DISABLE_TAB_WRAP=}")
