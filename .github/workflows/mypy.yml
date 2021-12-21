@@ -17,7 +17,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install black
-      - name: Checking format with black
+          pip install mypy
+     - name: Checking typing with mypy
         run: |
-          black --check --target-version py310 **/*.py
+          mypy --show-traceback **/*.py
