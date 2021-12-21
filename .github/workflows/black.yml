@@ -1,4 +1,4 @@
-name: CodeRyplStyle
+name: black
 
 on: [push, pull_request]
 

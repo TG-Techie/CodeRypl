@@ -1,4 +1,4 @@
-name: CodeRyplStyle
+name: mypy
 
 on: [push, pull_request]
 
