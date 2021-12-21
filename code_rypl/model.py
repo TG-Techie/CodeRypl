@@ -53,11 +53,11 @@ class Rplm:  # replacement model
         # match col:
         if col == 0:
             return self.first
-        if col == 1:
+        elif col == 1:
             return self.last
-        if col == 2:
+        elif col == 2:
             return self.num
-        if col == 3:
+        elif col == 3:
             return self.posn
         else:
             raise ValueError(f"{self}._get_field_by_col({col})")
@@ -65,11 +65,11 @@ class Rplm:  # replacement model
     def _set_field_by_col(self, col: int, value: str) -> None:
         if col == 0:
             self.first = value
-        if col == 1:
+        elif col == 1:
             self.last = value
-        if col == 2:
+        elif col == 2:
             self.num = value
-        if col == 3:
+        elif col == 3:
             self.posn = value
         else:
             raise ValueError(f"{self}._set_field_by_col({col})")
