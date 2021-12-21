@@ -20,7 +20,7 @@ jobs:
           pip install black
       - name: Checking format with black
         run: |
-          black --check --target-version py310 **/*.p
+          black --check --target-version py310 **/*.py
       - name: Checking typing with mypy
         run: |
           mypy --show-traceback **/*.py
