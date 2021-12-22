@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from typing import *
 
-from model import RplmFileModel, Rplm
+from model import *
 
 from PySide6.QtCore import (
     Qt,
@@ -37,10 +37,10 @@ class RplmTableView(QTableView):
         # navigation state
         self._skip_next_row_forward = False
 
-    def load_rplm_model(self, model: RplmFileModel) -> None:
-        self._model = model
-        model.set_selected_cell = self.setCurrentIndex
-        self.setModel(model)
+    def load_rplm_model(self, rplm_ls: RplmList) -> None:
+        self._rplm_list = rplm_ls
+        rplm_ls.set_selected_cell = self.setCurrentIndex
+        self.setModel(rplm_ls)
 
     def _init_format(self):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -60,7 +60,7 @@ class RplmTableView(QTableView):
 
         index = self.currentIndex()
 
-        self._model.insert(index.row(), Rplm.empty())
+        self._rplm_list.insert(index.row(), Player.empty())
         self._skip_next_row_forward = True and ENABLE_STAY_ON_INSERT_ABOVE
 
         if ENABLE_MOVE_TO_FIRST_ON_INSERT:
@@ -70,10 +70,10 @@ class RplmTableView(QTableView):
 
         index = self.currentIndex()
 
-        self._model.insert(index.row() + 1, Rplm.empty())
+        self._rplm_list.insert(index.row() + 1, Player.empty())
         self.setCurrentIndex(
             index.sibling(
-                (index.row() + 1) % len(self._model),
+                (index.row() + 1) % len(self._rplm_list),
                 0 if ENABLE_MOVE_TO_FIRST_ON_INSERT else index.column(),
             )
         )
@@ -82,13 +82,13 @@ class RplmTableView(QTableView):
     def move_right(self):
         index = self.currentIndex()
         self.setCurrentIndex(
-            index.siblingAtColumn((index.column() + 1) % Rplm.NUM_COLS)
+            index.siblingAtColumn((index.column() + 1) % Player.NUM_COLS)
         )
 
     def move_left(self):
         index = self.currentIndex()
         self.setCurrentIndex(
-            index.siblingAtColumn((index.column() - 1) % Rplm.NUM_COLS)
+            index.siblingAtColumn((index.column() - 1) % Player.NUM_COLS)
         )
 
     # def _move_to_first_row(self, index: QModelIndex):
@@ -99,11 +99,15 @@ class RplmTableView(QTableView):
 
     def move_down(self):
         index = self.currentIndex()
-        self.setCurrentIndex(index.siblingAtRow((index.row() + 1) % len(self._model)))
+        self.setCurrentIndex(
+            index.siblingAtRow((index.row() + 1) % len(self._rplm_list))
+        )
 
     def move_up(self):
         index = self.currentIndex()
-        self.setCurrentIndex(index.siblingAtRow((index.row() - 1) % len(self._model)))
+        self.setCurrentIndex(
+            index.siblingAtRow((index.row() - 1) % len(self._rplm_list))
+        )
 
     def go_col(self, col: int):
         index = self.currentIndex()
@@ -111,10 +115,12 @@ class RplmTableView(QTableView):
 
     def go(self, row: int, col: int):
         index = self.currentIndex()
-        self.setCurrentIndex(index.sibling(row % len(self._model), col % Rplm.NUM_COLS))
+        self.setCurrentIndex(
+            index.sibling(row % len(self._rplm_list), col % Player.num_cols())
+        )
 
     def remove_row(self, row: int):
-        self._model.pop(row)
+        self._rplm_list.pop(row)
         self.go_col(0)
 
     def eventFilter(self, _, event) -> bool:
@@ -135,10 +141,10 @@ class RplmTableView(QTableView):
         with_control = event.modifiers() & Qt.MetaModifier
         with_option = event.modifiers() & Qt.AltModifier
 
-        at_bottom = index.row() == len(self._model) - 1
-        at_h_hend = index.column() in {3, 4}
-        row_empty = self._model.get_rplm(index.row()).isempty()
-        cell_empty = self._model.get_rplm_field(index.row(), index.column()) == ""
+        at_bottom = index.row() == len(self._rplm_list) - 1
+        at_h_hend = index.column() == 3
+        row_empty = self._rplm_list.get_rplm(index.row()).isempty()
+        cell_empty = self._rplm_list.get_rplm_field(index.row(), index.column()) == ""
 
         # print(
         #     f"{is_enter=}, {is_tab=}, {is_backtab=}, {with_shift=}, {with_control=}, "
@@ -150,8 +156,8 @@ class RplmTableView(QTableView):
             self.remove_row(index.row())
             return True
         elif is_delete:
-            self._model.set_rplm_field(index.row(), index.column(), "")
-            self._model.refresh()
+            self._rplm_list.set_rplm_field(index.row(), index.column(), "")
+            self._rplm_list.refresh()
             return True
         elif is_tab and at_bottom and at_h_hend:
             if row_empty:
@@ -203,16 +209,16 @@ class RplmTableView(QTableView):
                 return True
 
         else:
-            if is_tab or is_enter or is_backtab:
-                import time
+            # if is_tab or is_enter or is_backtab:
+            #     import time
 
-                print()
-                print(time.monotonic(), "unhandled keypress", event.key())
-                print("fall thorught")
-                print(
-                    f"{is_enter=}, {is_tab=}, {is_backtab=}, {with_shift=}, {with_control=}, "
-                    f"{with_option=}, {at_bottom=}, {row_empty=}, {self._skip_next_row_forward=}, {cell_empty=}"
-                )
+            #     print()
+            #     print(time.monotonic(), "unhandled keypress", event.key())
+            #     print("fall thorught")
+            #     print(
+            #         f"{is_enter=}, {is_tab=}, {is_backtab=}, {with_shift=}, {with_control=}, "
+            #         f"{with_option=}, {at_bottom=}, {row_empty=}, {self._skip_next_row_forward=}, {cell_empty=}"
+            #     )
             return False
 
         # This should be unreachable (also grayed out with pylance)

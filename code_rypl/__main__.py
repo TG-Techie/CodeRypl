@@ -20,27 +20,31 @@ from PySide6.QtCore import (
 from PySide6.QtWidgets import (
     QApplication,
     QWidget,
+    QMainWindow,
     QVBoxLayout,
     QHBoxLayout,
     QPushButton,
     QLineEdit,
-    # QTextEdit,
-    # QLabel,
+    QTabWidget,
+    QTextEdit,
+    QLabel,
     QTableView,
-    QMainWindow,
     QSizePolicy,
-    # QScrollArea,
+    QScrollArea,
     QAbstractItemView,
     QHeaderView,
 )
 
 
-from model import RplmFileModel, Rplm
+from model import RplmFileModel, Player
 from table import RplmTableView
 
 # maybe name this code ryple document?
 @final
 class CodeRyplWindow(QMainWindow):
+
+    model: RplmFileModel
+
     @overload
     def __init__(self, model: RplmFileModel) -> None:
         ...
@@ -56,15 +60,25 @@ class CodeRyplWindow(QMainWindow):
 
         self.setFixedSize(720, 450)
 
-        self._skip_next_row_forward = False
-
         self.init_layout()
 
-        self.model = model = RplmFileModel.untitled() if model is None else model
+        model = RplmFileModel.untitled() if model is None else model
+        self._load_model(model)
 
-        self.table.load_rplm_model(model)
+        self._skip_next_row_forward = False
 
+    def _load_model(self, model: RplmFileModel) -> None:
+
+        self.model = model
         self.setWindowTitle(f"CodeRyple - {model.filename}")
+
+        self.coach_table.load_rplm_model(model.coaches)
+        self.player_table.load_rplm_model(model.players)
+
+        self.school_input.setText(model.school)
+        self.sport_input.setText(model.sport)
+        self.category_input.setText(model.category)
+        self.season_input.setText(model.season)
 
     def init_layout(self) -> None:
         # setup the base widget and layout
@@ -74,12 +88,22 @@ class CodeRyplWindow(QMainWindow):
         base_widget.setLayout(base_layout)
         self.setCentralWidget(base_widget)
 
+        # the app has three sections, header, metadata, and table
         self.header = header = self._make_header()
-        self.table = table = RplmTableView()
+        self.metadata = metadata = self._make_metadata()
+
+        self.player_table = player_table = RplmTableView()
+        self.coach_table = coach_table = RplmTableView()
+
+        # make a tab widget to hold the tables
+        self.tab_widget = tab_widget = QTabWidget()
+        tab_widget.addTab(player_table, "Players")
+        tab_widget.addTab(coach_table, "Coaches")
 
         # add the header and table to the layout
         base_layout.addLayout(header)
-        base_layout.addWidget(table)
+        base_layout.addLayout(metadata)
+        base_layout.addWidget(tab_widget)
 
         # self.setCentralWidget(table)
 
@@ -90,25 +114,61 @@ class CodeRyplWindow(QMainWindow):
         # self.filename_input = filename_input = QLineEdit(self.model.filename)
         self.export_button = export_button = QPushButton("Export")
 
-        # make the label fill the space between the buttons
-        # and center the text in the label
-        # filename_input.setSizePolicy(
-        #     QSizePolicy.MinimumExpanding, QSizePolicy.Preferred
-        # )
-        # filename_input.setAlignment(Qt.AlignCenter)  # type: ignore
-        # # filename_input.setFixedHeight(
-        #     QtGui.QFontMetrics(filename_input.font()).height() + 10
-        # )
-        # make the filename_input double clickable to edit
-        # filename_input.setReadOnly(False)
-        # filename_input.setTextInteractionFlags(Qt.TextSelectableByMouse)
-
         # add the buttons  and current lable to the horizontal layout
         header_layout.addWidget(open_button)
         # header_layout.addWidget(filename_input)
         header_layout.addWidget(export_button)
 
         return header_layout
+    
+    def export_file()
+
+    def _make_metadata(self) -> QHBoxLayout:
+        # the meta data has four fields:
+        # - school
+        # - sport
+        # - category (sex)
+        # - Intended Season
+
+        # each field is a text input with a lable above it
+        # the label is left justitied
+        # the fields are hoizontally aligned
+
+        self.metalayout = metalayout = QHBoxLayout()
+
+        # make the inputs
+        # TODO: make the default values based on teh laoded file_modle
+        self.school_input = school_input = QLineEdit("...")
+        school_input.setPlaceholderText("School of Name")
+        school_input.textEdited.connect(
+            lambda: self.model.set_meta(school=school_input.text())
+        )
+
+        self.sport_input = sport_input = QLineEdit("...")
+        sport_input.setPlaceholderText("SportsBall")
+        sport_input.textEdited.connect(
+            lambda: self.model.set_meta(sport=sport_input.text())
+        )
+
+        self.category_input = category_input = QLineEdit("...")
+        category_input.setPlaceholderText("mens, womens, etc")
+        category_input.textEdited.connect(
+            lambda: self.model.set_meta(category=category_input.text())
+        )
+
+        self.season_input = season_input = QLineEdit("...")
+        season_input.setPlaceholderText("1701-02")
+        season_input.textEdited.connect(
+            lambda: self.model.set_meta(season=season_input.text())
+        )
+
+        # add the widgets to the layout
+        metalayout.addWidget(school_input)
+        metalayout.addWidget(sport_input)
+        metalayout.addWidget(category_input)
+        metalayout.addWidget(season_input)
+
+        return metalayout
 
 
 class CodeRyplApplication(QApplication):
@@ -136,11 +196,5 @@ class CodeRyplApplication(QApplication):
 if __name__ == "__main__":
     app = CodeRyplApplication(sys.argv)
     window = app.new_window()
-
-    # window = CodeRyplWindow()
-    # window.show()
-
-    # window2 = CodeRyplWindow()
-    # window2.show()
 
     sys.exit(app.exec())

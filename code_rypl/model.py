@@ -19,92 +19,132 @@ from PySide6.QtWidgets import (
 )
 
 
-def error_popup(message):
+def blocking_error_popup(message):
     msgbox = QMessageBox()
     msgbox.setText(message)
     msgbox.exec()
 
 
-@dataclass(repr=True, frozen=False)
-class Rplm:  # replacement model
-    # class Field(Enum):
-    #     first = auto()
-    #     last = auto()
-    #     num = auto()
-    #     posn = auto()
+class Rplm:
 
-    first: str
-    last: str
-    num: str
-    posn: str
+    field_spec: ClassVar[dict[str, int]]
+    _cols: dict[int, str]
 
-    NUM_COLS = 4
+    def __new__(cls, **kwargs):
+        if cls is Rplm:
+            raise TypeError("cannot instantiate abstract class Rplm")
+        return object.__new__(cls)
 
-    # uuid: UUID = field(default_factory=uuid4, repr=False)
+    def __init__(self, **kwargs) -> None:
+
+        spec = self.field_spec
+
+        assert (
+            len(extras := set(kwargs) - set(spec)) == 0
+        ), f"unexpedted kwargs: {extras}"
+
+        assert (
+            len(missing := set(spec) - set(kwargs)) == 0
+        ), f"missing kwargs: {missing}"
+
+        assert set(spec) == set(kwargs), (
+            f"argument errors, got {set(kwargs)}, "
+            "however this assert should not have been reached, please report this bug"
+        )
+
+        self._cols = {spec[f]: kwargs[f] for f in kwargs}
+
+    def get_col(self, col: int) -> str:
+        print(col, self._cols)
+        return self._cols[col]
+
+    def set_col(self, col: int, value: str) -> None:
+        self._cols[col] = value
 
     def isempty(self) -> bool:
-        return {self.first, self.last, self.num, self.posn} == {""}
+        return set(self._cols.values()) == {""}
 
     @classmethod
-    def empty(cls):
-        return cls("", "", "", "")
+    def empty(cls) -> Rplm:
+        return cls(**{f: "" for f in cls.field_spec})
 
-    def _get_field_by_col(self, col: int) -> str:
-        # match col:
-        if col == 0:
-            return self.first
-        elif col == 1:
-            return self.last
-        elif col == 2:
-            return self.num
-        elif col == 3:
-            return self.posn
-        else:
-            raise ValueError(f"{self}._get_field_by_col({col})")
+    @classmethod
+    def num_cols(cls) -> int:
+        return len(cls.field_spec)  # type: ignore
 
-    def _set_field_by_col(self, col: int, value: str) -> None:
-        if col == 0:
-            self.first = value
-        elif col == 1:
-            self.last = value
-        elif col == 2:
-            self.num = value
-        elif col == 3:
-            self.posn = value
-        else:
-            raise ValueError(f"{self}._set_field_by_col({col})")
+    @classmethod
+    def prompt_for_col(cls, col: int) -> str:
+        for prompt, colno in cls.field_spec.items():
+            if colno == col:
+                return prompt
+        raise RuntimeError(f"unknown column {col} for {cls.__name__}")
 
 
-class RplmFileModel(QAbstractTableModel):
+class Player(Rplm):
 
-    _get_fieldname_by_col = {
-        0: "first",
-        1: "last",
-        2: "num",
-        3: "posn",
-    }
+    # TODO: make this a tuple
+    field_spec = dict(
+        first=0,
+        last=1,
+        num=2,
+        posn=3,
+    )
 
-    _blank_field_text_from_col = _get_fieldname_by_col
-    # {
-    #     0: "first ...",
-    #     1: "last ...",
-    #     2: "num ...",
-    #     3: "posn ...",
-    # }
 
-    def __init__(self, name: str, data: Iterable[Rplm]) -> None:
+class Coach(Rplm):
+
+    field_spec = dict(
+        first=0,
+        last=1,
+        kind=2,
+    )
+
+
+class RplmFileModel:
+    def __init__(
+        self,
+        *,
+        filename: None | str = None,
+        school: str = "",
+        sport: str = "",
+        category: str = "",
+        season: str = "",
+        players: Iterable[Player] | None = None,
+        coaches: Iterable[Coach] | None = None,
+        set_selected_cell: Callable[[QModelIndex], None] = None,
+    ) -> None:
         super().__init__()
-        self._data = list(data)
-        self._filename = name
-        self._last_used_index = QModelIndex()
-        self.set_selected_cell: Callable[[QModelIndex], None] = lambda _: None
 
-    def __len__(self):
-        return len(self._data)
+        self.players = players = (
+            RplmList([Player.empty()]) if players is None else RplmList(players)
+        )
+        self.coaches = coaches = (
+            RplmList([Coach.empty()]) if coaches is None else RplmList(coaches)
+        )
+
+        self.school = school
+        self.sport = sport
+        self.category = category
+        self.season = season
+
+        self.filename = filename
+
+        self._last_used_index = QModelIndex()
+
+        # intentionally not using the set_selected_cell not the internal one
+        self.set_selected_cell = (
+            set_selected_cell if set_selected_cell is not None else (lambda _: None)
+        )
 
     @property
-    def filename(self) -> str:
-        return self._filename
+    def set_selected_cell(self) -> Callable[[QModelIndex], None]:
+        return self._set_selected_cell
+
+    @set_selected_cell.setter
+    def set_selected_cell(self, set_selected_cell: Callable[[QModelIndex], None]):
+        self._set_selected_cell = set_selected_cell
+        self.players.set_selected_cell = set_selected_cell
+        self.coaches.set_selected_cell = set_selected_cell
 
     @classmethod
     def open(cls, filename: str) -> RplmFileModel:
@@ -115,19 +155,66 @@ class RplmFileModel(QAbstractTableModel):
 
     @classmethod
     def untitled(cls) -> RplmFileModel:
-        return cls("Untitled.rplm", [Rplm.empty()])
+        return cls(filename=None)
 
-    def current_rplem(self) -> Rplm:
+    def set_meta(
+        self,
+        school: None | str = None,
+        sport: None | str = None,
+        category: None | str = None,
+        season: None | str = None,
+    ):
+        if school is not None:
+            self.school = school
+        if sport is not None:
+            self.sport = sport
+        if category is not None:
+            self.category = category
+        if season is not None:
+            self.season = season
+
+
+R = TypeVar("R", bound=Rplm)
+
+
+class RplmList(Generic[R], QAbstractTableModel):
+    def __init__(
+        self,
+        data: Iterable[R],
+        set_selected_cell: Callable[[QModelIndex], None] = None,
+    ):
+        super().__init__()
+
+        self._data = list(data)
+        assert len(self._data) > 0, f"cannot create an empty RplmList"
+
+        self._data_type = type(self._data[0])
+
+        # live settable attr
+        self.set_selected_cell: Callable[[QModelIndex], None] = (
+            (lambda _: None) if set_selected_cell is None else set_selected_cell
+        )
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}[{self._data_type.__name__}](...)"
+
+    def current_rplm(self) -> R:
         return self._data[self._last_used_index.row()]
 
+    # QT interface methods
     def rowCount(self, index):
         # The length of the outer list.
         return len(self._data)
 
     def columnCount(self, index):
-        return 4
+        return self._data_type.num_cols()
 
     def data(self, index: QModelIndex, role: Qt.ItemDataRole):  # type: ignore
+
+        print(f"{self}.data({index}, {role})")
 
         if not index.isValid():
             return None
@@ -135,11 +222,11 @@ class RplmFileModel(QAbstractTableModel):
         self._last_used_index = index
 
         rplm = self._data[index.row()]
-        value = rplm._get_field_by_col(index.column())
+        value = rplm.get_col(index.column())
 
         if role == Qt.DisplayRole or role == Qt.EditRole:
             return (
-                value if len(value) else self._blank_field_text_from_col[index.column()]
+                value if len(value) else self._data_type.prompt_for_col(index.column())
             )
 
         elif role == Qt.ForegroundRole:
@@ -157,44 +244,42 @@ class RplmFileModel(QAbstractTableModel):
             raise ValueError(f"{self}.setData({index=}, {value=}, {role=})")
 
     def get_rplm_field(self, row: int, col: int) -> str:
-        return self._data[row]._get_field_by_col(col)
+        return self._data[row].get_col(col)
 
-    def get_rplm(self, row: int) -> Rplm:
+    def get_rplm(self, row: int) -> R:
         return self._data[row]
 
     def set_rplm_field(self, row: int, col: int, value) -> None:
 
         value = value.strip()
 
-        if value == self._blank_field_text_from_col[col]:
+        if value == self._data_type.prompt_for_col(col):
             value = ""
 
         rplm = self._data[row]
 
-        rplm._set_field_by_col(col, value)
+        rplm.set_col(col, value)
 
-    def append(self, rplm: Rplm):
+    def append(self, rplm: R):
         self._data.append(rplm)
         self.refresh()
         # self.set_selected_row(self._last_used_index.siblingAtRow(len(self._data) - 1))
 
-    def insert(self, row: int, rplm: Rplm) -> None:
+    def insert(self, row: int, rplm: R) -> None:
         self._data.insert(row, rplm)
         self.refresh()
 
     def refresh(self) -> None:
         self.layoutChanged.emit()
 
-    def pop(self, row: int) -> Rplm:
+    def pop(self, row: int) -> R:
         item = self._data.pop(row)
         if len(self._data) == 0:
-            self.append(Rplm.empty())
+            self.append(self._data_type.empty())  # type: ignore
         self.refresh()
         return item
 
     def flags(self, index):
-        # rplm = self._data[index.row()]
-        # prev = super().flags(index)
         return (
             Qt.ItemIsSelectable
             | Qt.ItemIsEnabled
@@ -207,7 +292,7 @@ class RplmFileModel(QAbstractTableModel):
         self._drop_sources = indicies
 
         if len(indicies) != 1:
-            error_popup(
+            blocking_error_popup(
                 f"Can only drag one item at a time, not {len(indicies)}.\n"
                 "(If you're Ryan reading this message, what would that even do?)"
             )

@@ -5,6 +5,16 @@
 
 A code-replacements graphical user interface to make editing replacements quick and easy
 
+# meta-data:
+- School
+- Sport
+- Sex
+- Intended Season(s) (arbitrary user-input string) Ex: "2021-2022"
+
+# coaches:
+- turns the tbale in into a tabbed area
+- 
+
 # todo:
 - add a backend to generate the exported file
 - make the RplmFileModel class handle file io (excluding export)
