@@ -20,5 +20,4 @@ jobs:
           pip install mypy
           pip install -r requirements.txt
       - name: Checking typing with mypy
-        run: |
-          mypy --show-traceback code_rypl
+        run: mypy -m code_rypl

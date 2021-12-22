@@ -5,7 +5,7 @@ from typing import *
 from typing import TextIO, BinaryIO
 
 import pathlib
-import msgpack
+import msgpack  # type: ignore[import]
 
 from .renderers.template import RplmFileRenderer
 

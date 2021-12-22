@@ -156,9 +156,9 @@ class CodeRyplDocumentWindow(QMainWindow):
         self.model.filename = name
         self.setWindowTitle(f"CodeRyple - {name}")
 
-    def close(self) -> None:
+    def close(self) -> bool:
         self.save()
-        super().close()
+        return super().close()
 
     def export_replacements(self):
         try:
