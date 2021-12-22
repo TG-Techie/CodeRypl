@@ -110,8 +110,12 @@ class CodeRyplMenuBar(QMenuBar):
         )
 
         # TODO: add a check to see if the file is already open, etc. and use pathlib.Path
-        if filename:
+        if self.doc.model.isempty():
+            self.doc.load_file_model(RplmFile.open(filename))
+        elif filename:
             self.doc.app.new_document(filename)
+        else:
+            blocking_popup(f"error opening file {filename!r}")
 
     def remove_empty_lines(self) -> None:
         self.doc.model.remove_empty_lines()
@@ -137,22 +141,22 @@ class CodeRyplDocumentWindow(QMainWindow):
         self.init_layout()
 
         model = RplmFile.untitled() if filename is None else RplmFile.open(filename)
-        self._load_model(model)
+        self.load_file_model(model)
 
         # file export state
         self._last_export_path = (
             pathlib.Path.home() if filename is None else pathlib.Path(filename).parent
         )
 
-    def _load_model(self, model: RplmFile) -> None:
+    def load_file_model(self, model: RplmFile) -> None:
 
         self.model = model
         self.setWindowTitle(
             f"CodeRyple - {'Untitled.rplm' if model.filename is None else model.filename}"
         )
 
-        self.coach_table.load_rplm_model(model.coaches)
-        self.player_table.load_rplm_model(model.players)
+        self.coach_table.load_rplm_list(model.coaches)
+        self.player_table.load_rplm_list(model.players)
 
         self.school_input.setText(model.school)
         self.sport_input.setText(model.sport)
@@ -168,22 +172,38 @@ class CodeRyplDocumentWindow(QMainWindow):
             raise RuntimeError("No table has focus")
 
     def save(self) -> None:
+        """
+        if this has been unsaved, save as. otehrwise,
+        save to the current file
+        """
         if self.model.filename is None:
             self.save_as()
         else:
             self.model.save_to_file(self.model.filename)
 
     def save_as(self) -> None:
+        if self.model.isempty():
+            suggested_filename = "SaveAs"
+        else:
+            try:
+                suggested_filename = self._resolve_suggested_filename(
+                    ChosenRenderer(**self.model.meta_as_dict()), "SameAs"
+                )
+            except Exception as err:
+                print(f"Error resolving suggested filename: {err}")
+                suggested_filename = "SaveAs"
+
         # open the file dialog
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(
             self,
             "Save File As",
-            str(self._last_export_path / "SaveAs.rplm"),
+            str(self._last_export_path / f"{suggested_filename}.rplm"),
             "RPLM Files (*.rplm)",
         )
 
         path = pathlib.Path(filename)
 
+        # TODO: maybe spruce this up?
         try:
             if filename:
                 self.model.save_to_file(filename)
@@ -191,9 +211,10 @@ class CodeRyplDocumentWindow(QMainWindow):
             blocking_popup(f"Error saving file({type(e).__name__}): {e}")
             raise e
 
-        self.rename(".".join(path.name.split(".")[:-1]))
+        self.rename(str(path))
 
     def rename(self, name: str) -> None:
+        # alter the data instead of opening a new file
         self.model.filename = name
         self.setWindowTitle(f"CodeRyple - {name}")
 
@@ -207,12 +228,9 @@ class CodeRyplDocumentWindow(QMainWindow):
         try:
             renderer = ChosenRenderer(**self.model.meta_as_dict())
 
-            exportname = self.model.filename
-            if exportname is None:
-                exportname = renderer.suggested_filename()
-            if exportname is None:
-                exportname = "Untitled.rplm"
+            exportname = self._resolve_suggested_filename(renderer, "Untitled") + ".txt"
 
+            # promot the user to select a file
             raw_exportpath, _ = QtWidgets.QFileDialog.getSaveFileName(
                 self,
                 caption="Export File",
@@ -222,26 +240,46 @@ class CodeRyplDocumentWindow(QMainWindow):
 
             exportpath = pathlib.Path(raw_exportpath)
 
+            # some sanity checks on the export path
             if raw_exportpath in {None, ""}:
                 raise ExportError("No file selected")
-
             if exportpath.exists() and not exportpath.is_file():
                 raise ExportError("Export path is not a file")
-
             if exportpath.suffix != ".txt":
                 raise ExportError("Export path must end in .txt")
 
+            # save it so future exports open at the same location
             self._last_export_path = exportpath.parent
 
-            with exportpath.open("w") as file:
-                file.truncate(0)
-                self.model.export_into(file, renderer=renderer)
-
-            blocking_popup(f"Export Successful!\n" f"(exported to: {exportpath!r})")
+            try:
+                # do the actual export!!
+                with exportpath.open("w") as file:
+                    file.truncate(0)
+                    self.model.export_into(file, renderer=renderer)
+            except Exception as err:
+                blocking_popup(f"Error exporting file({type(err).__name__}): {err}")
+                raise err
+            else:
+                # TODO: consider removing this
+                # show a confirmation dialog
+                blocking_popup(f"Export Successful!\n" f"(exported to: {exportpath!r})")
 
         except Exception as e:
             blocking_popup(f"{type(e).__name__}: {e}")
             raise e
+
+    def _resolve_suggested_filename(
+        self, renderer: ChosenRenderer, default: str
+    ) -> str:
+        currentname = self.model.filename
+        suggested_name = renderer.suggested_filename()
+        if currentname is not None:
+            # remove the extension
+            return ".".join(currentname.split(".")[:-1])
+        elif suggested_name is not None:
+            return suggested_name
+        else:
+            return default
 
     # === qt / gui setup ===
 
@@ -253,48 +291,40 @@ class CodeRyplDocumentWindow(QMainWindow):
         base_widget.setLayout(base_layout)
         self.setCentralWidget(base_widget)
 
-        # the app has three sections, header, metadata, and table
-        self.header = header = self._make_header()
+        # === the header contains the meta data, export button, and save button ===
+        self.header = header = QHBoxLayout()
+        # this is too long and boring to put right in here
         self.metadata = metadata = self._make_metadata()
+        # save button
+        self.save_button = save_button = QPushButton("Save")
+        save_button.clicked.connect(self.save)
+        # export button
+        self.export_button = export_button = QPushButton("Export")
+        export_button.clicked.connect(self.export_replacements)
+        # add the export button so it is on the right
+        header.addLayout(metadata)
+        header.addWidget(save_button)
+        header.addWidget(export_button)
 
-        self.player_table = player_table = RplmTableView()
-        self.coach_table = coach_table = RplmTableView()
-
-        # make a tab widget to hold the tables
+        # ==== the tables for players and coaches are in a tab view ====
         self.tab_widget = tab_widget = QTabWidget()
-
-        tab_widget.addTab(player_table, "Players")
-        tab_widget.addTab(coach_table, "Coaches")
         tab_widget.setTabPosition(QTabWidget.North)
         tab_widget.tabBar().setDocumentMode(True)
         tab_widget.tabBar().setExpanding(True)
-
         # TODO: make the selected tab color a little better, but fine for now
         tab_widget.tabBar().setStyle(QtWidgets.QStyleFactory.create("Fusion"))
 
-        # add the header and table to the layout
+        # --- the player table ---
+        self.player_table = player_table = RplmTableView()
+        self.coach_table = coach_table = RplmTableView()
+
+        # add the tables as tabs
+        tab_widget.addTab(player_table, "Players")
+        tab_widget.addTab(coach_table, "Coaches")
+
+        # === overal strucutre ===
         base_layout.addLayout(header)
-        base_layout.addLayout(metadata)
         base_layout.addWidget(tab_widget)
-
-        # self.setCentralWidget(table)
-
-    def _make_header(self) -> QHBoxLayout:
-        self.header_layout = header_layout = QHBoxLayout()
-        # create the open and export buttons and labels
-        self.open_button = open_button = QPushButton("Open")
-        # self.filename_input = filename_input = QLineEdit(self.model.filename)
-        self.export_button = export_button = QPushButton("Export")
-
-        # connect the buttons to the actions
-        export_button.clicked.connect(self.export_replacements)
-
-        # add the buttons  and current lable to the horizontal layout
-        header_layout.addWidget(open_button)
-        # header_layout.addWidget(filename_input)
-        header_layout.addWidget(export_button)
-
-        return header_layout
 
     def _make_metadata(self) -> QHBoxLayout:
 
