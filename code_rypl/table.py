@@ -136,7 +136,7 @@ class RplmTableView(QTableView):
         with_option = event.modifiers() & Qt.AltModifier
 
         at_bottom = index.row() == len(self._model) - 1
-        at_right = index.column() == 3
+        at_h_hend = index.column() in {3, 4}
         row_empty = self._model.get_rplm(index.row()).isempty()
         cell_empty = self._model.get_rplm_field(index.row(), index.column()) == ""
 
@@ -146,20 +146,20 @@ class RplmTableView(QTableView):
         # )
 
         # TODO: cmd-z and m=cmd-sft-z
-        if is_delete:
+        if is_delete and with_shift:
+            self.remove_row(index.row())
+            return True
+        elif is_delete:
             self._model.set_rplm_field(index.row(), index.column(), "")
             self._model.refresh()
             return True
-        elif is_delete and with_shift:
-            self.remove_row(index.row())
-            return True
-        elif is_tab and at_bottom and at_right:
+        elif is_tab and at_bottom and at_h_hend:
             if row_empty:
                 self.go_col(0)
             else:
                 self.insert_below()
             return True
-        if is_tab and at_right:
+        if is_tab and at_h_hend:
             if row_empty:
                 self.go_col(0)
             else:
@@ -176,19 +176,19 @@ class RplmTableView(QTableView):
             if with_shift and with_option:
                 self.insert_above()
                 return False
-            if with_shift:
+            elif with_shift:
                 self.move_up()
                 return True
-            if with_option:
+            elif with_option:
                 self.insert_below()
                 return True
-            if at_bottom and at_right:
+            elif at_bottom and at_h_hend:
                 if row_empty:
                     self.go_col(0)
                 else:
                     self.insert_below()
                 return True
-            if at_right:
+            elif at_h_hend:
                 self.move_down()
                 self.go_col(0)
                 return True
