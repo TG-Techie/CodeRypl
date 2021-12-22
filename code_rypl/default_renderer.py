@@ -19,11 +19,15 @@ class SportAbbreviationError(Exception):
     
 class SexError(Exception):
     pass
+
+
+def _strip(st):
+    return st.lower().strip().replace("\t","")
     
     
 def _strong_strip(st):
-        return st.lower().strip().replace(" ","").replace("\t","")
-
+    return _strip(st).replace(" ","")
+    
 
 class DefaultRplmFileRenderer:
     
