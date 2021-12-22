@@ -5,24 +5,9 @@
 
 A code-replacements graphical user interface to make editing replacements quick and easy
 
-# meta-data:
-- School
-- Sport
-- Sex
-- Intended Season(s) (arbitrary user-input string) Ex: "2021-2022"
+# TODO for later review:
 
-# coaches:
-- turns the tbale in into a tabbed area
-- 
-
-# todo:
-- add a backend to generate the exported file
-- make the RplmFileModel class handle file io (excluding export)
-- move the Table and event filer into it's own class to better segment the program
-- add a way to enter the metadata? (school etc)
-- save as a file outside of exporting to the text format
-    - There is some discussion to be had over if .rplm files should be a thing
-    - it means opening a file doesn't need to parse code replacements but can just load the interal represention
-    - it also mean it could export to several format
-    - If that funcationality is desired it could be performed with a different button/function
- 
+- make the meta data fields auto normalize on enter
+- ie add methods to the renderer that normalize the raw into to a nicer on. this would be for sport, category, and year
+  EX: `Man`, `m`, `Male` -> `Mens` or soemthing like that
+- add a hash of file contents on save and expose it as `model.are_unsaved_changes()` for prompting to save on / etc (maybe even expose via gui)
