@@ -48,7 +48,7 @@ class DefaultRplmFileRenderer:
         self.coaches = dict()
 
     def suggested_filename(self) -> None | str:
-        ...
+        raise NotImplementedError
 
     def render_player(self, *, first: str, last: str, num: str, posn: str) -> str:
         """
@@ -64,32 +64,29 @@ class DefaultRplmFileRenderer:
             )
         )
 
-
     def render_coach(self, *, first: str, last: str, kind: str) -> str:
         """
         returns the output line into the exported  file for the coach
         """
         kind_ab = self._kind_abbv(kind)
 
-        return "\t".join((
-            f"{self.call}{kind_ab}"
-            f"{self.school}'s {kind}, {first} {last}, ",
-            f"{first} {last}, ",
-            f"{last}"
-        ))
+        return "\t".join(
+            (
+                f"{self.call}{kind_ab}" f"{self.school}'s {kind}, {first} {last}, ",
+                f"{first} {last}, ",
+                f"{last}",
+            )
+        )
 
-    
     def _kind_abbv(self, kind):
-        self.coaches[kind] = self.coaches.get(kind, 0)+1
+        self.coaches[kind] = self.coaches.get(kind, 0) + 1
         ret = ""
         for item in kind:
             ret += item[0]
         return ret + coaches[kind]
 
-
     def _call(self, school, sport, sex):
         return abbv + sex + sport
-
 
     def _abbv(self, school):
 

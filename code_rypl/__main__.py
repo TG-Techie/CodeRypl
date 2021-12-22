@@ -157,7 +157,7 @@ class CodeRyplWindow(QMainWindow):
         )
 
         self.season_input = season_input = QLineEdit("...")
-        season_input.setPlaceholderText("1701-02")
+        season_input.setPlaceholderText("year")
         season_input.textEdited.connect(
             lambda: self.model.set_meta(season=season_input.text())
         )
