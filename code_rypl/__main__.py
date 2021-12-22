@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-import os
+import pathlib
 
 from typing import *
 from dataclasses import dataclass, field
@@ -10,13 +10,8 @@ from dataclasses import dataclass, field
 # import the necessary modules
 import PySide6 as pyside
 from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtCore import (
-    Qt,
-    # QModelIndex,
-    # QAbstractTableModel,
-    # QMimeData,
-    QEvent,
-)
+from PySide6.QtGui import QFontMetrics
+
 from PySide6.QtWidgets import (
     QApplication,
     QWidget,
@@ -26,6 +21,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QLineEdit,
     QTabWidget,
+    QTabBar,
     QTextEdit,
     QLabel,
     QTableView,
@@ -36,8 +32,38 @@ from PySide6.QtWidgets import (
 )
 
 
-from model import RplmFileModel, Player
+from model import RplmFileModel, RplmList, blocking_popup
 from table import RplmTableView
+
+# parse the command line arguments
+renderer_args = {arg.split("=")[1] for arg in sys.argv if arg.startswith("--renderer=")}
+assert len(renderer_args) <= 1, "Only one renderer can be specified"
+if len(renderer_args) == 0:
+    renderer_name = "default"
+else:
+    (renderer_name,) = renderer_args
+
+if renderer_name == "default":
+    from renderers.default import RplmFileRenderer as ChosenRenderer
+elif renderer_name == "test":
+    from renderers.test import RplmFileRenderer as ChosenRenderer
+else:
+    raise NotImplementedError(
+        f"cutom renderers not implemented yet, got `--renderer={renderer_name}`"
+    )
+
+
+# class TwoFullTabWidget(QTabWidget):
+#     def showEvent(self, event: QtGui.QShowEvent) -> None:
+#         super().showEvent(event)
+#         print(self.styleSheet())
+#         self.setStyleSheet(f"QTabBar::tab {{\n\twidth: {self.width()//2 - 24}px;\n}}")
+#         print(self.styleSheet())
+
+
+class ExportError(Exception):
+    pass
+
 
 # maybe name this code ryple document?
 @final
@@ -65,12 +91,15 @@ class CodeRyplWindow(QMainWindow):
         model = RplmFileModel.untitled() if model is None else model
         self._load_model(model)
 
-        self._skip_next_row_forward = False
+        # file export state
+        self._last_export_path = pathlib.Path.home()
 
     def _load_model(self, model: RplmFileModel) -> None:
 
         self.model = model
-        self.setWindowTitle(f"CodeRyple - {model.filename}")
+        self.setWindowTitle(
+            f"CodeRyple - {'Untitled' if model.filename is None else model.filename}"
+        )
 
         self.coach_table.load_rplm_model(model.coaches)
         self.player_table.load_rplm_model(model.players)
@@ -79,6 +108,46 @@ class CodeRyplWindow(QMainWindow):
         self.sport_input.setText(model.sport)
         self.category_input.setText(model.category)
         self.season_input.setText(model.season)
+
+    def export_replacements(self):
+        try:
+            renderer = ChosenRenderer(**self.model.meta_as_dict())
+
+            exportname = self.model.filename
+            if exportname is None:
+                exportname = renderer.suggested_filename()
+            if exportname is None:
+                exportname = "Untitled"
+
+            raw_exportpath, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self,
+                caption="Export File",
+                dir=str(self._last_export_path / exportname),
+                filter="text files (*.txt)",
+            )
+
+            exportpath = pathlib.Path(raw_exportpath)
+
+            if raw_exportpath in {None, ""}:
+                raise ExportError("No file selected")
+
+            if exportpath.exists() and not exportpath.is_file():
+                raise ExportError("Export path is not a file")
+
+            if exportpath.suffix != ".txt":
+                raise ExportError("Export path must end in .txt")
+
+            self._last_export_path = exportpath.parent
+
+            with exportpath.open("w") as file:
+                file.truncate(0)
+                self.model.export_into(file, renderer=renderer)
+
+            blocking_popup(f"Export Successful!\n" f"(exported to: {exportpath!r})")
+
+        except Exception as e:
+            blocking_popup(f"{type(e).__name__}: {e}")
+            raise e
 
     def init_layout(self) -> None:
         # setup the base widget and layout
@@ -97,8 +166,15 @@ class CodeRyplWindow(QMainWindow):
 
         # make a tab widget to hold the tables
         self.tab_widget = tab_widget = QTabWidget()
+
         tab_widget.addTab(player_table, "Players")
         tab_widget.addTab(coach_table, "Coaches")
+        tab_widget.setTabPosition(QTabWidget.North)
+        tab_widget.tabBar().setDocumentMode(True)
+        tab_widget.tabBar().setExpanding(True)
+
+        # TODO: make the selected tab color a little better, but fine for now
+        tab_widget.tabBar().setStyle(QtWidgets.QStyleFactory.create("Fusion"))
 
         # add the header and table to the layout
         base_layout.addLayout(header)
@@ -114,50 +190,52 @@ class CodeRyplWindow(QMainWindow):
         # self.filename_input = filename_input = QLineEdit(self.model.filename)
         self.export_button = export_button = QPushButton("Export")
 
+        # connect the buttons to the actions
+        export_button.clicked.connect(self.export_replacements)
+
         # add the buttons  and current lable to the horizontal layout
         header_layout.addWidget(open_button)
         # header_layout.addWidget(filename_input)
         header_layout.addWidget(export_button)
 
         return header_layout
-    
-    def export_file()
 
     def _make_metadata(self) -> QHBoxLayout:
-        # the meta data has four fields:
-        # - school
-        # - sport
-        # - category (sex)
-        # - Intended Season
-
-        # each field is a text input with a lable above it
-        # the label is left justitied
-        # the fields are hoizontally aligned
 
         self.metalayout = metalayout = QHBoxLayout()
 
         # make the inputs
         # TODO: make the default values based on teh laoded file_modle
-        self.school_input = school_input = QLineEdit("...")
+        self.school_input = school_input = QLineEdit("")
         school_input.setPlaceholderText("School of Name")
+        school_input.setFixedHeight(
+            int(QFontMetrics(school_input.font()).height() * 1.8)
+        )
         school_input.textEdited.connect(
             lambda: self.model.set_meta(school=school_input.text())
         )
 
-        self.sport_input = sport_input = QLineEdit("...")
+        self.sport_input = sport_input = QLineEdit("")
         sport_input.setPlaceholderText("SportsBall")
+        sport_input.setFixedHeight(int(QFontMetrics(sport_input.font()).height() * 1.8))
         sport_input.textEdited.connect(
             lambda: self.model.set_meta(sport=sport_input.text())
         )
 
-        self.category_input = category_input = QLineEdit("...")
+        self.category_input = category_input = QLineEdit("")
         category_input.setPlaceholderText("mens, womens, etc")
+        category_input.setFixedHeight(
+            int(QFontMetrics(category_input.font()).height() * 1.8)
+        )
         category_input.textEdited.connect(
             lambda: self.model.set_meta(category=category_input.text())
         )
 
-        self.season_input = season_input = QLineEdit("...")
-        season_input.setPlaceholderText("1701-02")
+        self.season_input = season_input = QLineEdit("")
+        season_input.setPlaceholderText("year")
+        season_input.setFixedHeight(
+            int(QFontMetrics(season_input.font()).height() * 1.8)
+        )
         season_input.textEdited.connect(
             lambda: self.model.set_meta(season=season_input.text())
         )

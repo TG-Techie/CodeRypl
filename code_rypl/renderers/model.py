@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import sys
 from typing import *
-from typing import TextIO
-
 from dataclasses import dataclass, field
 
 from PySide6 import QtGui
@@ -23,7 +21,7 @@ from PySide6.QtWidgets import (
 from renderers.template import RplmFileRenderer
 
 
-def blocking_popup(message):
+def blocking_error_popup(message):
     msgbox = QMessageBox()
     msgbox.setText(message)
     msgbox.exec()
@@ -66,12 +64,6 @@ class Rplm:
 
     def set_col(self, col: int, value: str) -> None:
         self._cols[col] = value
-
-    def field(self, name: str) -> str:
-        return self._cols[self.field_spec[name]]
-
-    def fields_as_dict(self) -> dict[str, str]:
-        return {f: self.field(f) for f in self.field_spec}
 
     def isempty(self) -> bool:
         return set(self._cols.values()) == {""}
@@ -169,13 +161,44 @@ class RplmFileModel:
     def untitled(cls) -> RplmFileModel:
         return cls(filename=None)
 
-    def meta_as_dict(self) -> dict[str, str]:
-        return dict(
+    def export_file(self, render_session_generator: Type[RplmFileRenderer]) -> None:
+        print(render_session_generator)
+        renderer = render_session_generator(
             school=self.school,
             sport=self.sport,
             category=self.category,
             season=self.season,
         )
+
+        print(
+            "==========================starting export==========================\n\n\n"
+        )
+
+        filename = renderer.suggested_filename()
+
+        if self.filename is None:
+            filename = "Untitled"
+
+        filename = filename + ".txt"
+
+        print(f"{filename=}")
+
+        # TODO: skip empty lines
+        for player in self.players:
+            # todo: make this not shit
+            renderer.render_player(
+                first=player.get_col(0),
+                last=player.get_col(1),
+                num=player.get_col(2),
+                posn=player.get_col(3),
+            )
+
+        for coach in self.coaches:
+            renderer.render_coach(
+                first=coach.get_col(0),
+                last=coach.get_col(1),
+                kind=coach.get_col(2),
+            )
 
     def set_meta(
         self,
@@ -192,50 +215,6 @@ class RplmFileModel:
             self.category = category
         if season is not None:
             self.season = season
-
-    def export_into(self, file: TextIO, *, renderer: RplmFileRenderer) -> None:
-
-        file.writelines(
-            renderer.render_player(**player.fields_as_dict()) + "\n"
-            for player in self.players
-            if not player.isempty()
-        )
-
-        file.writelines(
-            renderer.render_coach(**coaches.fields_as_dict()) + "\n"
-            for coaches in self.coaches
-            if not coaches.isempty()
-        )
-
-    # def export_file(self, render_session_generator: Type[RplmFileRenderer]) -> None:
-    #     print(render_session_generator)
-    #     renderer = render_session_generator(
-    #         school=self.school,
-    #         sport=self.sport,
-    #         category=self.category,
-    #         season=self.season,
-    #     )
-
-    #     print(
-    #         "==========================starting export==========================\n\n\n"
-    #     )
-
-    #     filename = renderer.suggested_filename()
-
-    #     if self.filename is None:
-    #         filename = "Untitled"
-
-    #     filename = filename + ".txt"
-
-    #     print(f"{filename=}")
-
-    #     # TODO: skip empty lines
-    #     for player in self.players:
-    #         # todo: make this not shit
-    #         renderer.render_player(**player.fields_as_dict())
-
-    #     for coach in self.coaches:
-    #         renderer.render_coach(**coach.fields_as_dict())
 
 
 class RplmList(Generic[R], QAbstractTableModel):
@@ -356,7 +335,7 @@ class RplmList(Generic[R], QAbstractTableModel):
         self._drop_sources = indicies
 
         if len(indicies) != 1:
-            blocking_popup(
+            blocking_error_popup(
                 f"Can only drag one item at a time, not {len(indicies)}.\n"
                 "(If you're Ryan reading this message, what would that even do?)"
             )
