@@ -11,9 +11,7 @@ class RplmFileRenderer:
     def suggested_filename(self) -> None | str:
         return None
 
-    def render_player(
-        self, *, first: str, last: str, num: str, posn: None | str
-    ) -> str:
+    def render_player(self, *, first: str, last: str, num: str, posn: str) -> str:
         """
         returns the output line into the exported  file for the player
         """
