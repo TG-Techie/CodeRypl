@@ -102,7 +102,7 @@ class RplmFileRenderer:
         for sex, inputs in GENDER_LUT.items():
             if category in inputs:
                 return sex
-        raise SexError("""Got {category}, need "men", "women", or "none".""")
+        raise SexError(f"""Got {category}, need "men", "women", or "none".""")
 
     def _sport(self, sport: str) -> str:
         sport = _strong_strip(sport)

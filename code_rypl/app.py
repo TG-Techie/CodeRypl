@@ -27,11 +27,12 @@ class CodeRyplApplication(QApplication):
         sys.exit(self.exec())
 
 
-@click.command()
-@click.argument("filename", required=False)
-def run(filename: str | None):
+def run(filename: str | None = None) -> NoReturn:
 
     app = CodeRyplApplication(sys.argv)
+
+    # parse filename
+    # [arg for arg in sys.argv if not arg.startswith("-")]
 
     app.new_document(filename)
 
