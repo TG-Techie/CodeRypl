@@ -319,6 +319,10 @@ class RplmFile:
             if not coaches.isempty()
         )
 
+    def remove_empty_lines(self) -> None:
+        self.players.remove_empty_lines()
+        self.coaches.remove_empty_lines()
+
 
 class RplmList(Generic[R], QAbstractTableModel):
     def __init__(
@@ -417,6 +421,7 @@ class RplmList(Generic[R], QAbstractTableModel):
 
     def refresh(self) -> None:
         self.layoutChanged.emit()
+    
 
     def pop(self, row: int) -> R:
         item = self._data.pop(row)
@@ -424,6 +429,12 @@ class RplmList(Generic[R], QAbstractTableModel):
             self.append(self._data_type.empty())  # type: ignore
         self.refresh()
         return item
+
+    def remove_empty_lines(self) -> None:
+        self._data = [r for r in self._data if not r.isempty()]
+        self.refresh()
+
+    # === qt / ui interface ===
 
     def flags(self, index):
         return (

@@ -63,14 +63,42 @@ class CodeRyplMenuBar(QMenuBar):
 
         self.doc = doc
 
+        self._setup_file_menu()
+        self._setup_edit_menu()
+
+    def _setup_file_menu(self) -> None:
         self.file_menu = file_menu = self.addMenu("File")
-        file_menu.addAction("new", self.doc.app.new_document)
-        file_menu.addAction("Open", self.open_file)
+        file_menu.addAction("new", self.doc.app.new_document, "Ctrl+N")
+        file_menu.addAction("Open", self.open_file, "Ctrl+O")
+        file_menu.addSeparator()
         # TODO: add open recent
-        file_menu.addAction("Save", self.doc.save)
-        file_menu.addAction("Save As", self.doc.save_as)
-        file_menu.addAction("Export", self.doc.export_replacements)
+        file_menu.addAction("Save", self.doc.save, "Ctrl+S")
+        file_menu.addAction("Save As", self.doc.save_as, "Ctrl+Shift+S")
+        file_menu.addSeparator()
+        # export
+        file_menu.addAction("Export", self.doc.export_replacements, "Ctrl+Shift+E")
         file_menu.addAction("Close", self.doc.close)
+
+    def _setup_edit_menu(self) -> None:
+        edit_menu = self.addMenu("Edit")
+        # todo: add undo/redo
+        edit_menu.addAction(
+            "Undo", lambda: blocking_popup("Undo not implemented yet"), "Ctrl+Z"
+        )
+        edit_menu.addAction(
+            "Redo", lambda: blocking_popup("Redo not implemented yet"), "Ctrl+Shift+Z"
+        )
+        edit_menu.addAction(
+            "About", lambda: blocking_popup("About not implemented yet, but Hi!")
+        )
+        edit_menu.addSeparator()
+        # remove empty lines
+        edit_menu.addAction(
+            "Delete Line",
+            # lamdbd so self is captured and not bound to the model item
+            lambda: self.doc.get_focused_table().remove_selected_row(),
+        )
+        edit_menu.addAction("Remove Empty Lines", self.remove_empty_lines)
 
         # TODO: add an edit meu for removing blank lines, etc.
 
@@ -82,6 +110,9 @@ class CodeRyplMenuBar(QMenuBar):
         # TODO: add a check to see if the file is already open, etc. and use pathlib.Path
         if filename:
             self.doc.app.new_document(filename)
+
+    def remove_empty_lines(self) -> None:
+        self.doc.model.remove_empty_lines()
 
 
 # maybe name this code ryple document?
@@ -126,6 +157,14 @@ class CodeRyplDocumentWindow(QMainWindow):
         self.category_input.setText(model.category)
         self.season_input.setText(model.season)
 
+    def get_focused_table(self) -> None | RplmTableView:
+        if self.coach_table.hasFocus():
+            return self.coach_table
+        elif self.player_table.hasFocus():
+            return self.player_table
+        else:
+            raise RuntimeError("No table has focus")
+
     def save(self) -> None:
         if self.model.filename is None:
             self.save_as()
@@ -157,6 +196,8 @@ class CodeRyplDocumentWindow(QMainWindow):
         self.setWindowTitle(f"CodeRyple - {name}")
 
     def close(self) -> bool:
+        # TDOD: add change check and skip save if it has not changed
+        # TODO: add a confirmation dialog
         self.save()
         return super().close()
 
@@ -199,6 +240,8 @@ class CodeRyplDocumentWindow(QMainWindow):
         except Exception as e:
             blocking_popup(f"{type(e).__name__}: {e}")
             raise e
+
+    # === qt / gui setup ===
 
     def init_layout(self) -> None:
         # setup the base widget and layout
