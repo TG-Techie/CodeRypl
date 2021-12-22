@@ -421,7 +421,6 @@ class RplmList(Generic[R], QAbstractTableModel):
 
     def refresh(self) -> None:
         self.layoutChanged.emit()
-    
 
     def pop(self, row: int) -> R:
         item = self._data.pop(row)

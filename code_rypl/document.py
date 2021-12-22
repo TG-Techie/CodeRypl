@@ -96,7 +96,9 @@ class CodeRyplMenuBar(QMenuBar):
         edit_menu.addAction(
             "Delete Line",
             # lamdbd so self is captured and not bound to the model item
-            lambda: self.doc.get_focused_table().remove_selected_row(),
+            lambda: None
+            if (table := self.doc.get_focused_table()) is None
+            else table.remove_selected_row(),
         )
         edit_menu.addAction("Remove Empty Lines", self.remove_empty_lines)
 
