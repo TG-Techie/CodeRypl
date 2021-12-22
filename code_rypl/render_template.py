@@ -18,7 +18,7 @@ class RplmFileRenderer(Protocol):
         """
         ...
 
-    def render_player(self, *, first: str, last: str, kind: str) -> str:
+    def render_coach(self, *, first: str, last: str, kind: str) -> str:
         """
         returns the output line into the exported  file for the coach
         """

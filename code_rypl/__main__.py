@@ -36,8 +36,13 @@ from PySide6.QtWidgets import (
 )
 
 
-from model import RplmFileModel, Player
+from model import RplmFileModel, RplmList
 from table import RplmTableView
+
+if "--renderer=test" in sys.argv:
+    from test_renderer import TestFileRender as ChoosenRplmRenderer
+else:
+    from default_render_session import DefaultRplmFileRenderer as ChoosenRplmRenderer
 
 # maybe name this code ryple document?
 @final
@@ -114,14 +119,19 @@ class CodeRyplWindow(QMainWindow):
         # self.filename_input = filename_input = QLineEdit(self.model.filename)
         self.export_button = export_button = QPushButton("Export")
 
+        # connect the buttons to the actions
+        export_button.clicked.connect(self.export_file)
+
         # add the buttons  and current lable to the horizontal layout
         header_layout.addWidget(open_button)
         # header_layout.addWidget(filename_input)
         header_layout.addWidget(export_button)
 
         return header_layout
-    
-    def export_file()
+
+    def export_file(self):
+        print("export")
+        self.model.export_file(ChoosenRplmRenderer)
 
     def _make_metadata(self) -> QHBoxLayout:
         # the meta data has four fields:

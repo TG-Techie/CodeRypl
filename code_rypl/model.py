@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 
+from render_template import RplmFileRenderer
+
 
 def blocking_error_popup(message):
     msgbox = QMessageBox()
@@ -55,7 +57,6 @@ class Rplm:
         self._cols = {spec[f]: kwargs[f] for f in kwargs}
 
     def get_col(self, col: int) -> str:
-        print(col, self._cols)
         return self._cols[col]
 
     def set_col(self, col: int, value: str) -> None:
@@ -157,6 +158,45 @@ class RplmFileModel:
     def untitled(cls) -> RplmFileModel:
         return cls(filename=None)
 
+    def export_file(self, render_session_generator: Type[RplmFileRenderer]) -> None:
+        print(render_session_generator)
+        renderer = render_session_generator(
+            school=self.school,
+            sport=self.sport,
+            category=self.category,
+            season=self.season,
+        )
+
+        print(
+            "==========================starting export==========================\n\n\n"
+        )
+
+        filename = renderer.suggested_filename()
+
+        if self.filename is None:
+            filename = "Untitled"
+
+        filename = filename + ".txt"
+
+        print(f"{filename=}")
+
+        # TODO: skip empty lines
+        for player in self.players:
+            # todo: make this not shit
+            renderer.render_player(
+                first=player.get_col(0),
+                last=player.get_col(1),
+                num=player.get_col(2),
+                posn=player.get_col(3),
+            )
+
+        for coach in self.coaches:
+            renderer.render_coach(
+                first=coach.get_col(0),
+                last=coach.get_col(1),
+                kind=coach.get_col(2),
+            )
+
     def set_meta(
         self,
         school: None | str = None,
@@ -201,6 +241,9 @@ class RplmList(Generic[R], QAbstractTableModel):
     def __str__(self) -> str:
         return f"{type(self).__name__}[{self._data_type.__name__}](...)"
 
+    def __iter__(self) -> Iterator[R]:
+        return iter(self._data)
+
     def current_rplm(self) -> R:
         return self._data[self._last_used_index.row()]
 
@@ -214,7 +257,7 @@ class RplmList(Generic[R], QAbstractTableModel):
 
     def data(self, index: QModelIndex, role: Qt.ItemDataRole):  # type: ignore
 
-        print(f"{self}.data({index}, {role})")
+        # print(f"{self}.data({index}, {role})")
 
         if not index.isValid():
             return None
