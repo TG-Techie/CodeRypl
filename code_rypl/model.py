@@ -342,6 +342,9 @@ class RplmList(Generic[R], QAbstractTableModel):
             (lambda _: None) if set_selected_cell is None else set_selected_cell
         )
 
+    def isempty(self) -> bool:
+        return len(self._data) == 0 or all(d.isempty() for d in self._data)
+
     def __len__(self) -> int:
         return len(self._data)
 

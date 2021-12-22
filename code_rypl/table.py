@@ -37,7 +37,7 @@ class RplmTableView(QTableView):
         # navigation state
         self._skip_next_row_forward = False
 
-    def load_rplm_model(self, rplm_ls: RplmList) -> None:
+    def load_rplm_list(self, rplm_ls: RplmList) -> None:
         self._rplm_list = rplm_ls
         rplm_ls.set_selected_cell = self.setCurrentIndex
         self.setModel(rplm_ls)
@@ -150,17 +150,10 @@ class RplmTableView(QTableView):
         row_empty = self._rplm_list.get_rplm(index.row()).isempty()
         cell_empty = self._rplm_list.get_rplm_field(index.row(), index.column()) == ""
 
-        # print(
-        #     f"{is_enter=}, {is_tab=}, {is_backtab=}, {with_shift=}, {with_control=}, "
-        #     f"{with_option=}, {at_bottom=}, {row_empty=}, {self._skip_next_row_forward=}, {cell_empty=}"
-        # )
-
-        # TODO: cmd-z and m=cmd-sft-z
-        # moved to edit menu
-        # if is_delete and with_shift:
-        #     self.remove_row(index.row())
-        #     return True
-        if is_delete:
+        if is_delete and with_shift:
+            self.remove_selected_row()
+            return True
+        elif is_delete:
             self.remove_selected_row()
             return True
         elif is_tab and at_bottom and at_h_hend:
@@ -212,16 +205,6 @@ class RplmTableView(QTableView):
                 return True
 
         else:
-            # if is_tab or is_enter or is_backtab:
-            #     import time
-
-            #     print()
-            #     print(time.monotonic(), "unhandled keypress", event.key())
-            #     print("fall thorught")
-            #     print(
-            #         f"{is_enter=}, {is_tab=}, {is_backtab=}, {with_shift=}, {with_control=}, "
-            #         f"{with_option=}, {at_bottom=}, {row_empty=}, {self._skip_next_row_forward=}, {cell_empty=}"
-            #     )
             return False
 
         # This should be unreachable (also grayed out with pylance)
