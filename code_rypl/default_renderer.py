@@ -27,7 +27,6 @@ def _strong_strip(st):
 
 class DefaultRplmFileRenderer:
     
-
     def __init__(self, *, school: str, sport: str, category: str, season: str) -> None:
         self.school = school
         self.sport = self._sport(sport)
@@ -39,7 +38,12 @@ class DefaultRplmFileRenderer:
         ...
 
     def render_player(self, *, first: str, last: str, num: str, posn: str) -> str:
-        return f"{self.call}{num}\t"
+        return "\t".join((
+            f"{self.call}{num}",
+            f"{self.school}'s {(x+', ')*bool(x)} {first} {last} ({num}), ",
+            f"{first} {last} ({num}), ",
+            f"{last}"
+        ))
         """
         returns the output line into the exported  file for the player without newline
         "<call><num>\t<school>'s <pos,> <first> <last> (num), \t<first> <last> (<num>), \t<last>"
@@ -53,8 +57,6 @@ class DefaultRplmFileRenderer:
         ...
     
     def _call(self, school, sport, sex):
-        
-        
         return abbv + sex + sport
         
     def _abbv(self, school):
