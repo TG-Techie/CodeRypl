@@ -1,6 +1,6 @@
 name: black
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
   build:
@@ -20,5 +20,4 @@ jobs:
           pip install black
           pip install -r requirements.txt
       - name: Checking format with black
-        run: |
-          black --check --target-version py310 **/*.py
+        run: black --check --target-version py310 code_rypl/**/*.py

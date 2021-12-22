@@ -123,6 +123,10 @@ class RplmTableView(QTableView):
         self._rplm_list.pop(row)
         self.go_col(0)
 
+    def remove_selected_row(self):
+        index = self.currentIndex()
+        self.remove_row(index.row())
+
     def eventFilter(self, _, event) -> bool:
 
         index = self.currentIndex()
@@ -152,12 +156,12 @@ class RplmTableView(QTableView):
         # )
 
         # TODO: cmd-z and m=cmd-sft-z
-        if is_delete and with_shift:
-            self.remove_row(index.row())
-            return True
-        elif is_delete:
-            self._rplm_list.set_rplm_field(index.row(), index.column(), "")
-            self._rplm_list.refresh()
+        # moved to edit menu
+        # if is_delete and with_shift:
+        #     self.remove_row(index.row())
+        #     return True
+        if is_delete:
+            self.remove_selected_row()
             return True
         elif is_tab and at_bottom and at_h_hend:
             if row_empty:
@@ -172,7 +176,6 @@ class RplmTableView(QTableView):
                 self.go(index.row() + 1, 0)
             return True
         elif is_tab and DISABLE_TAB_WRAP:
-            print("asdf")
             self.move_right()
             return True
         elif is_backtab and DISABLE_TAB_WRAP:

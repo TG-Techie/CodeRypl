@@ -14,7 +14,6 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtGui import QFontMetrics
 
 from PySide6.QtWidgets import (
-    QApplication,
     QWidget,
     QMainWindow,
     QVBoxLayout,
@@ -22,16 +21,11 @@ from PySide6.QtWidgets import (
     QPushButton,
     QLineEdit,
     QTabWidget,
-    QTabBar,
-    QTextEdit,
-    QLabel,
-    QTableView,
-    QSizePolicy,
-    QScrollArea,
-    QAbstractItemView,
-    QHeaderView,
+    QMenuBar,
 )
 
+if TYPE_CHECKING:
+    from .app import CodeRyplApplication
 
 # parse the command line arguments
 renderer_args = {arg.split("=")[1] for arg in sys.argv if arg.startswith("--renderer=")}
@@ -63,40 +57,98 @@ class ExportError(Exception):
     pass
 
 
+class CodeRyplMenuBar(QMenuBar):
+    def __init__(self, doc: CodeRyplDocumentWindow) -> None:
+        super().__init__()
+
+        self.doc = doc
+
+        self._setup_file_menu()
+        self._setup_edit_menu()
+
+    def _setup_file_menu(self) -> None:
+        self.file_menu = file_menu = self.addMenu("File")
+        file_menu.addAction("new", self.doc.app.new_document, "Ctrl+N")
+        file_menu.addAction("Open", self.open_file, "Ctrl+O")
+        file_menu.addSeparator()
+        # TODO: add open recent
+        file_menu.addAction("Save", self.doc.save, "Ctrl+S")
+        file_menu.addAction("Save As", self.doc.save_as, "Ctrl+Shift+S")
+        file_menu.addSeparator()
+        # export
+        file_menu.addAction("Export", self.doc.export_replacements, "Ctrl+Shift+E")
+        file_menu.addAction("Close", self.doc.close)
+
+    def _setup_edit_menu(self) -> None:
+        edit_menu = self.addMenu("Edit")
+        # todo: add undo/redo
+        edit_menu.addAction(
+            "Undo", lambda: blocking_popup("Undo not implemented yet"), "Ctrl+Z"
+        )
+        edit_menu.addAction(
+            "Redo", lambda: blocking_popup("Redo not implemented yet"), "Ctrl+Shift+Z"
+        )
+        edit_menu.addAction(
+            "About", lambda: blocking_popup("About not implemented yet, but Hi!")
+        )
+        edit_menu.addSeparator()
+        # remove empty lines
+        edit_menu.addAction(
+            "Delete Line",
+            # lamdbd so self is captured and not bound to the model item
+            lambda: None
+            if (table := self.doc.get_focused_table()) is None
+            else table.remove_selected_row(),
+        )
+        edit_menu.addAction("Remove Empty Lines", self.remove_empty_lines)
+
+        # TODO: add an edit meu for removing blank lines, etc.
+
+    def open_file(self) -> None:
+        filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Open File", "", "RPLM Files (*.rplm)"
+        )
+
+        # TODO: add a check to see if the file is already open, etc. and use pathlib.Path
+        if filename:
+            self.doc.app.new_document(filename)
+
+    def remove_empty_lines(self) -> None:
+        self.doc.model.remove_empty_lines()
+
+
 # maybe name this code ryple document?
-@final
 class CodeRyplDocumentWindow(QMainWindow):
 
     model: RplmFile
 
-    @overload
-    def __init__(self, model: RplmFile) -> None:
-        ...
-
-    @overload
-    def __init__(self) -> None:
-        ...
-
-    def __init__(self, model: None | RplmFile = None) -> None:
+    def __init__(self, app: CodeRyplApplication, filename: None | str = None) -> None:
         # TODO: make this take a filename as an argument and open it
         # or none for an untitled one
         super().__init__()
 
+        self.app = app
+
         self.setFixedSize(720, 450)
+
+        self.menu_bar = menu_bar = CodeRyplMenuBar(self)
+        self.setMenuBar(menu_bar)
 
         self.init_layout()
 
-        model = RplmFile.untitled() if model is None else model
+        model = RplmFile.untitled() if filename is None else RplmFile.open(filename)
         self._load_model(model)
 
         # file export state
-        self._last_export_path = pathlib.Path.home()
+        self._last_export_path = (
+            pathlib.Path.home() if filename is None else pathlib.Path(filename).parent
+        )
 
     def _load_model(self, model: RplmFile) -> None:
 
         self.model = model
         self.setWindowTitle(
-            f"CodeRyple - {'Untitled' if model.filename is None else model.filename}"
+            f"CodeRyple - {'Untitled.rplm' if model.filename is None else model.filename}"
         )
 
         self.coach_table.load_rplm_model(model.coaches)
@@ -107,6 +159,50 @@ class CodeRyplDocumentWindow(QMainWindow):
         self.category_input.setText(model.category)
         self.season_input.setText(model.season)
 
+    def get_focused_table(self) -> None | RplmTableView:
+        if self.coach_table.hasFocus():
+            return self.coach_table
+        elif self.player_table.hasFocus():
+            return self.player_table
+        else:
+            raise RuntimeError("No table has focus")
+
+    def save(self) -> None:
+        if self.model.filename is None:
+            self.save_as()
+        else:
+            self.model.save_to_file(self.model.filename)
+
+    def save_as(self) -> None:
+        # open the file dialog
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Save File As",
+            str(self._last_export_path / "SaveAs.rplm"),
+            "RPLM Files (*.rplm)",
+        )
+
+        path = pathlib.Path(filename)
+
+        try:
+            if filename:
+                self.model.save_to_file(filename)
+        except Exception as e:
+            blocking_popup(f"Error saving file({type(e).__name__}): {e}")
+            raise e
+
+        self.rename(".".join(path.name.split(".")[:-1]))
+
+    def rename(self, name: str) -> None:
+        self.model.filename = name
+        self.setWindowTitle(f"CodeRyple - {name}")
+
+    def close(self) -> bool:
+        # TDOD: add change check and skip save if it has not changed
+        # TODO: add a confirmation dialog
+        self.save()
+        return super().close()
+
     def export_replacements(self):
         try:
             renderer = ChosenRenderer(**self.model.meta_as_dict())
@@ -115,7 +211,7 @@ class CodeRyplDocumentWindow(QMainWindow):
             if exportname is None:
                 exportname = renderer.suggested_filename()
             if exportname is None:
-                exportname = "Untitled"
+                exportname = "Untitled.rplm"
 
             raw_exportpath, _ = QtWidgets.QFileDialog.getSaveFileName(
                 self,
@@ -146,6 +242,8 @@ class CodeRyplDocumentWindow(QMainWindow):
         except Exception as e:
             blocking_popup(f"{type(e).__name__}: {e}")
             raise e
+
+    # === qt / gui setup ===
 
     def init_layout(self) -> None:
         # setup the base widget and layout
@@ -245,32 +343,3 @@ class CodeRyplDocumentWindow(QMainWindow):
         metalayout.addWidget(season_input)
 
         return metalayout
-
-
-class CodeRyplApplication(QApplication):
-    def __init__(self, *args, **kwargs):
-
-        super().__init__(*args, **kwargs)
-
-        self._windows: list[CodeRyplDocumentWindow] = []
-        # # the below commented code was auto-suggested by copilot
-        # self.setStyle("Fusion")
-        # self.setStyleSheet(
-        #     open(
-        #         os.path.join(os.path.dirname(__file__), "..", "styles", "fusion.qss"),
-        #         "r",
-        #     ).read()
-        # )
-
-    def new_window(self):
-        window = CodeRyplDocumentWindow()
-        self._windows.append(window)
-        window.show()
-        return window
-
-
-def run_main() -> NoReturn:
-    app = CodeRyplApplication(sys.argv)
-    window = app.new_window()
-
-    sys.exit(app.exec())
