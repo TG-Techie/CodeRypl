@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import *
 
 
-class TestFileRender:
+class RplmFileRenderer:
     def __init__(self, *, school: str, sport: str, category: str, season: str) -> None:
         print(
             f"{self.__class__.__name__}.__init__({school=}, {sport=}, {category=}, {season=})"
