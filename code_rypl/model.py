@@ -4,7 +4,7 @@ import sys
 from typing import *
 from typing import TextIO
 
-from dataclasses import dataclass, field
+from .renderers.template import RplmFileRenderer
 
 from PySide6 import QtGui
 
@@ -19,8 +19,6 @@ from PySide6.QtCore import (
 from PySide6.QtWidgets import (
     QMessageBox,
 )
-
-from renderers.template import RplmFileRenderer
 
 
 def blocking_popup(message):
@@ -112,7 +110,7 @@ class Coach(Rplm):
     )
 
 
-class RplmFileModel:
+class RplmFile:
     def __init__(
         self,
         *,
@@ -159,14 +157,14 @@ class RplmFileModel:
         self.coaches.set_selected_cell = set_selected_cell
 
     @classmethod
-    def open(cls, filename: str) -> RplmFileModel:
+    def open(cls, filename: str) -> RplmFile:
         raise NotImplementedError(
             f"fromfile not implemented for {cls.__name__}.open({filename})"
         )
         # return cls(data)
 
     @classmethod
-    def untitled(cls) -> RplmFileModel:
+    def untitled(cls) -> RplmFile:
         return cls(filename=None)
 
     def meta_as_dict(self) -> dict[str, str]:

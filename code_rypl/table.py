@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from typing import *
 
-from model import *
+from .model import *
 
 from PySide6.QtCore import (
     Qt,
