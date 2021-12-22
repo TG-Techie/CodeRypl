@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import sys
 from typing import *
-from typing import TextIO
+from typing import TextIO, BinaryIO
+
+import pathlib
+import msgpack  # type: ignore[import]
 
 from .renderers.template import RplmFileRenderer
 
@@ -20,7 +23,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 
-
+# TODO: move this into a separate file for ui logic?
+# or.... only let it be used in the main window vie catching raised errors.
+# consider making a custom exeption for this? it could wrap the original error or a str
 def blocking_popup(message):
     msgbox = QMessageBox()
     msgbox.setText(message)
@@ -35,12 +40,12 @@ class Rplm:
     field_spec: ClassVar[dict[str, int]]
     _cols: dict[int, str]
 
-    def __new__(cls, **kwargs):
+    def __new__(cls, *args, **kwargs):
         if cls is Rplm:
             raise TypeError("cannot instantiate abstract class Rplm")
         return object.__new__(cls)
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: str) -> None:
 
         spec = self.field_spec
 
@@ -59,6 +64,16 @@ class Rplm:
 
         self._cols = {spec[f]: kwargs[f] for f in kwargs}
 
+    @classmethod
+    def from_cols(self: Type[R], *args: str) -> R:
+        assert len(args) == len(
+            self.field_spec
+        ), f"expected {len(self.field_spec)}, got {len(args)}"
+        return self(**{f: args[col] for f, col in self.field_spec.items()})
+
+    def as_cols(self) -> tuple[str, ...]:
+        return tuple(self._cols[col] for col in range(self.num_cols()))
+
     def get_col(self, col: int) -> str:
         return self._cols[col]
 
@@ -68,7 +83,7 @@ class Rplm:
     def field(self, name: str) -> str:
         return self._cols[self.field_spec[name]]
 
-    def fields_as_dict(self) -> dict[str, str]:
+    def as_fields(self) -> dict[str, str]:
         return {f: self.field(f) for f in self.field_spec}
 
     def isempty(self) -> bool:
@@ -110,7 +125,36 @@ class Coach(Rplm):
     )
 
 
+class MetaAsDict(TypedDict):
+    school: str
+    sport: str
+    category: str
+    season: str
+
+
+class PlayerAsDict(TypedDict):
+    first: str
+    last: str
+    num: str
+    posn: str
+
+
+class CoachAsDict(TypedDict):
+    first: str
+    last: str
+    kind: str
+
+
+class SaveDict(TypedDict):
+    meta: MetaAsDict
+    players: tuple[PlayerAsDict, ...]
+    coaches: tuple[CoachAsDict, ...]
+
+
 class RplmFile:
+
+    metadata_spec: ClassVar[set[str]] = {"school", "sport", "category", "season"}
+
     def __init__(
         self,
         *,
@@ -139,9 +183,11 @@ class RplmFile:
 
         self.filename = filename
 
+        # TODO: store a hash of the last saved file contents here
+        # self._last_save: int = None
         self._last_used_index = QModelIndex()
 
-        # intentionally not using the set_selected_cell not the internal one
+        # intentionally  using the set_selected_cell setter not the internal attribute
         self.set_selected_cell = (
             set_selected_cell if set_selected_cell is not None else (lambda _: None)
         )
@@ -158,16 +204,84 @@ class RplmFile:
 
     @classmethod
     def open(cls, filename: str) -> RplmFile:
-        raise NotImplementedError(
-            f"fromfile not implemented for {cls.__name__}.open({filename})"
+        path = pathlib.Path(filename)
+        assert path.exists(), f"{filename} does not exist"
+        assert path.is_file(), f"{filename} is not a file"
+        assert path.suffix == ".rplm", f"{filename} is not a .rplm file"
+
+        with path.open("rb") as file:
+            return cls._from_file(file)
+
+    def save_to_file(self, filename: str) -> None:
+        path = pathlib.Path(filename)
+
+        if path.exists():
+            assert path.is_file(), f"{filename} is not a file"
+
+        assert path.suffix == ".rplm", f"{filename} is not a .rplm file"
+
+        if path.exists():
+            blocking_popup(f"{filename} already exists, overwriting")
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with path.open("wb") as file:
+            file.truncate(0)
+            self._into_file(file)
+
+    def _into_file(self, into: BinaryIO) -> None:
+        data = self._to_save_dict()
+        # TODO: add hash to see if the file has changed
+        msgpack.pack(data, into)
+
+    def _to_save_dict(self) -> SaveDict:
+        return SaveDict(
+            meta=self.meta_as_dict(),
+            players=tuple(p.as_fields() for p in self.players),  # type: ignore
+            coaches=tuple(c.as_fields() for c in self.coaches),  # type: ignore
         )
-        # return cls(data)
+
+    @classmethod
+    def _from_file(cls, file: BinaryIO) -> RplmFile:
+
+        data = msgpack.unpack(file)
+
+        # validate the data
+
+        # check for missing keys
+        assert "meta" in data, f"missing meta section in {file}"
+        meta: MetaAsDict = data["meta"]
+
+        # check all the meta fields are present
+        assert set(meta) == set(
+            cls.metadata_spec
+        ), f"missing meta fields: {set(cls.metadata_spec) - set(meta)}"
+
+        assert "players" in data, f"missing players section in {file}"
+        players: list[PlayerAsDict] = data["players"]
+
+        assert "coaches" in data, f"missing coaches section in {file}"
+        coaches: List[CoachAsDict] = data["coaches"]
+
+        return cls(
+            **meta,
+            players=(Player(**p) for p in players),
+            coaches=(Coach(**c) for c in coaches),
+            filename=file.name,
+        )
 
     @classmethod
     def untitled(cls) -> RplmFile:
         return cls(filename=None)
 
-    def meta_as_dict(self) -> dict[str, str]:
+    def isempty(self) -> bool:
+        return (
+            self.players.isempty()
+            and self.coaches.isempty()
+            and set(m.strip() for m in self.meta_as_dict().values()) == {""}  # type: ignore
+        )
+
+    def meta_as_dict(self) -> MetaAsDict:
         return dict(
             school=self.school,
             sport=self.sport,
@@ -194,46 +308,16 @@ class RplmFile:
     def export_into(self, file: TextIO, *, renderer: RplmFileRenderer) -> None:
 
         file.writelines(
-            renderer.render_player(**player.fields_as_dict()) + "\n"
+            renderer.render_player(**player.as_fields()) + "\n"
             for player in self.players
             if not player.isempty()
         )
 
         file.writelines(
-            renderer.render_coach(**coaches.fields_as_dict()) + "\n"
+            renderer.render_coach(**coaches.as_fields()) + "\n"
             for coaches in self.coaches
             if not coaches.isempty()
         )
-
-    # def export_file(self, render_session_generator: Type[RplmFileRenderer]) -> None:
-    #     print(render_session_generator)
-    #     renderer = render_session_generator(
-    #         school=self.school,
-    #         sport=self.sport,
-    #         category=self.category,
-    #         season=self.season,
-    #     )
-
-    #     print(
-    #         "==========================starting export==========================\n\n\n"
-    #     )
-
-    #     filename = renderer.suggested_filename()
-
-    #     if self.filename is None:
-    #         filename = "Untitled"
-
-    #     filename = filename + ".txt"
-
-    #     print(f"{filename=}")
-
-    #     # TODO: skip empty lines
-    #     for player in self.players:
-    #         # todo: make this not shit
-    #         renderer.render_player(**player.fields_as_dict())
-
-    #     for coach in self.coaches:
-    #         renderer.render_coach(**coach.fields_as_dict())
 
 
 class RplmList(Generic[R], QAbstractTableModel):

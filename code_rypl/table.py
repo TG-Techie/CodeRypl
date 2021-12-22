@@ -172,7 +172,6 @@ class RplmTableView(QTableView):
                 self.go(index.row() + 1, 0)
             return True
         elif is_tab and DISABLE_TAB_WRAP:
-            print("asdf")
             self.move_right()
             return True
         elif is_backtab and DISABLE_TAB_WRAP:
