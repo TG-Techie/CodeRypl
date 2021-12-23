@@ -68,7 +68,7 @@ class CodeRyplMenuBar(QMenuBar):
 
     def _setup_file_menu(self) -> None:
         self.file_menu = file_menu = self.addMenu("File")
-        file_menu.addAction("new", self.doc.app.new_document, "Ctrl+N")
+        file_menu.addAction("New", self.doc.app.new_document, "Ctrl+N")
         file_menu.addAction("Open", self.open_file, "Ctrl+O")
         file_menu.addSeparator()
         # TODO: add open recent
@@ -83,13 +83,18 @@ class CodeRyplMenuBar(QMenuBar):
         edit_menu = self.addMenu("Edit")
         # todo: add undo/redo
         edit_menu.addAction(
-            "Undo", lambda: blocking_popup("Undo not implemented yet"), "Ctrl+Z"
+            "Undo",
+            lambda: blocking_popup("Undo not implemented"),
+            "Ctrl+Z",
         )
         edit_menu.addAction(
-            "Redo", lambda: blocking_popup("Redo not implemented yet"), "Ctrl+Shift+Z"
+            "Redo",
+            lambda: blocking_popup("Redo not implemented"),
+            "Ctrl+Shift+Z",
         )
         edit_menu.addAction(
-            "About", lambda: blocking_popup("About not implemented yet, but Hi!")
+            "About",
+            lambda: blocking_popup("About not implemented, but Hi! I'm software."),
         )
         edit_menu.addSeparator()
         # remove empty lines

@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import *
 
 import sys
-import click
 
 from .document import CodeRyplDocumentWindow
 
@@ -32,7 +31,6 @@ def run(filename: str | None = None) -> NoReturn:
     app = CodeRyplApplication(sys.argv)
 
     # parse filename
-    # [arg for arg in sys.argv if not arg.startswith("-")]
 
     app.new_document(filename)
 
