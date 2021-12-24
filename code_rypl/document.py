@@ -396,6 +396,7 @@ class CodeRyplDocumentWindow(QMainWindow):
             )
 
         if on_change is not None:
+            # use textChanged so it saves to the model on every keystroke
             widget.textChanged.connect(on_change)
 
         if normalize is not None:

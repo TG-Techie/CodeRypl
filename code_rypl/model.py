@@ -72,6 +72,9 @@ class Rplm:
         ), f"expected {len(self.field_spec)}, got {len(args)}"
         return self(**{f: args[col] for f, col in self.field_spec.items()})
 
+    def hashstr(self) -> str:
+        return "({})".format(", ".join(self._cols.values()))
+
     def as_cols(self) -> tuple[str, ...]:
         return tuple(self._cols[col] for col in range(self.num_cols()))
 
@@ -201,6 +204,14 @@ class RplmFile:
             set_selected_cell if set_selected_cell is not None else (lambda _: None)
         )
 
+        self._last_save_hash: int | None = None
+
+    def set_as_saved_now(self) -> None:
+        self._last_save_hash = hash(self.hashstr())
+
+    def changed(self) -> bool:
+        return self._last_save_hash != hash(self.hashstr())
+
     @property
     def set_selected_cell(self) -> Callable[[QModelIndex], None]:
         return self._set_selected_cell
@@ -219,7 +230,9 @@ class RplmFile:
         assert path.suffix == ".rplm", f"{filename} is not a .rplm file"
 
         with path.open("rb") as file:
-            return cls._from_file(file)
+            file_model = cls._from_file(file)
+        file_model.set_as_saved_now()
+        return file_model
 
     def save_to_file(self, filename: str) -> None:
         path = pathlib.Path(filename)
@@ -237,6 +250,9 @@ class RplmFile:
         with path.open("wb") as file:
             file.truncate(0)
             self._into_file(file)
+
+        if filename == self.filename:
+            self.set_as_saved_now()
 
     def _into_file(self, into: BinaryIO) -> None:
         data = self._to_save_dict()
@@ -288,6 +304,19 @@ class RplmFile:
             self.players.isempty()
             and self.coaches.isempty()
             and set(m.strip() for m in self.meta_as_dict().values()) == {""}  # type: ignore
+        )
+
+    def hashstr(self) -> str:
+        return hash(
+            "|".join(
+                self.school,
+                self.sport,
+                self.category,
+                self.season,
+                self.filename,
+                self.players.hashstr(),
+                self.coaches.hashstr(),
+            )
         )
 
     def meta_as_dict(self) -> MetaAsDict:
@@ -353,6 +382,9 @@ class RplmList(Generic[R], QAbstractTableModel):
 
     def isempty(self) -> bool:
         return len(self._data) == 0 or all(d.isempty() for d in self._data)
+
+    def hashstr(self) -> str:
+        return f"(players:{'|'.join(d.hashstr() for d in self._data)})"
 
     def __len__(self) -> int:
         return len(self._data)
