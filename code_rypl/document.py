@@ -116,11 +116,20 @@ class CodeRyplMenuBar(QMenuBar):
 
     def open_file(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(
-            self, "Open File", "", "RPLM Files (*.rplm)"
+            self, "Open File", str(self.doc._last_export_path), "RPLM Files (*.rplm)"
         )
 
-        # TODO: add a check to see if the file is already open, etc. and use pathlib.Path
-        if self.doc.model.isempty():
+        # TODO: add a proper check to see if the file is already open, using app. swithc focus
+
+        if filename in (
+            (other_doc := d).model.filename for d in self.doc.app._documents
+        ):
+            other_doc.switch_focus()
+            return
+
+        if filename == "":  # then open canceled
+            return
+        elif self.doc.model.isempty():
             self.doc.load_file_model(RplmFile.open(filename))
         elif filename:
             self.doc.app.new_document(filename)
@@ -158,6 +167,12 @@ class CodeRyplDocumentWindow(QMainWindow):
         self._last_export_path = (
             pathlib.Path.home() if filename is None else pathlib.Path(filename).parent
         )
+
+    def switch_focus(self) -> None:
+        # set focus to this window
+        self.app.setActiveWindow(self)
+        # move the window to the front
+        self.raise_()
 
     def get_focused_table(self) -> None | RplmTableView:
         if self.coach_table.hasFocus():
