@@ -336,6 +336,9 @@ class CodeRyplDocumentWindow(QMainWindow):
 
         self.sport_input = sport_input = self._make_metatext_input(
             prompt="SportsBall",
+            about_width_of=max(
+                renderer_tools.sport_abrev_to_formal_name.values(), key=len
+            ),
             suggestions=renderer_tools.sport_abrev_to_formal_name.values(),
             normalize=renderer_tools.normalize_sports,
             on_change=lambda: self.model.set_meta(sport=sport_input.text()),
@@ -343,6 +346,7 @@ class CodeRyplDocumentWindow(QMainWindow):
 
         self.category_input = category_input = self._make_metatext_input(
             prompt="Men's, Women's, etc",
+            about_width_of=":Women's",
             suggestions=renderer_tools.category_formal_to_variations,
             normalize=renderer_tools.normalize_category,
             on_change=lambda: self.model.set_meta(category=category_input.text()),
@@ -353,8 +357,9 @@ class CodeRyplDocumentWindow(QMainWindow):
 
         self.season_input = season_input = self._make_metatext_input(
             prompt=suggested_season,
+            about_width_of=":0000-00",
             normalize=renderer_tools.normalize_season,
-            suggestions=[suggested_season],
+            suggestions=[suggested_season, f":{suggested_season}"],
             suggestion_inline=True,
             on_change=lambda: self.model.set_meta(category=season_input.text()),
         )
@@ -371,6 +376,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         self,
         *,
         prompt: str,
+        about_width_of: str | None = None,
         on_change: Callable[[], None] | None = None,
         normalize: Callable[[str], str] | None = None,
         suggestions: Iterable[str] | None = None,
@@ -380,7 +386,14 @@ class CodeRyplDocumentWindow(QMainWindow):
         widget = QLineEdit("")
         metrics = QFontMetrics(widget.font())
         widget.setPlaceholderText(prompt)
-        widget.setFixedHeight(int(metrics.height() * 1.8))
+        widget.setFixedHeight(int(metrics.height() * 2))
+
+        widget.setStyleSheet("QLineEdit { border-radius: 5%; }")
+
+        if about_width_of is not None:
+            widget.setFixedWidth(
+                QFontMetrics(widget.font()).boundingRect(about_width_of).width() * 1.25
+            )
 
         if on_change is not None:
             widget.textChanged.connect(on_change)
