@@ -38,6 +38,8 @@ def remove_prepositions(string: str) -> str:
     """
     Removes prepositions from a string.
     """
+    if isescaped(string):
+        return ":" + strip_escape(string)
     return " ".join(filter(lambda x: x not in prepositions, string.split()))
 
 
@@ -45,6 +47,8 @@ def abbreviate(string: str) -> str:
     """
     Abbreviates sports names.
     """
+    if isescaped(string):
+        return ":" + strip_escape(string)
     return "".join(
         word[0].lower()  # lowercase first letter
         for word in string.split()  # for each word
