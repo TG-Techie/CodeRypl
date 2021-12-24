@@ -27,6 +27,8 @@ from PySide6.QtWidgets import (
 )
 
 from .renderers import tools as renderer_tools
+from .model import Player, Coach
+from .table import CoachItemDelegate
 
 
 if TYPE_CHECKING:
@@ -82,7 +84,7 @@ class CodeRyplMenuBar(QMenuBar):
         file_menu.addSeparator()
         # export
         file_menu.addAction("Export", self.doc.export_replacements, "Ctrl+Shift+E")
-        file_menu.addAction("Close", self.doc.close)
+        file_menu.addAction("Close", self.doc.close, "Ctrl+W")
 
     def _setup_edit_menu(self) -> None:
         edit_menu = self.addMenu("Edit")
@@ -111,8 +113,6 @@ class CodeRyplMenuBar(QMenuBar):
             else table.remove_selected_row(),
         )
         edit_menu.addAction("Remove Empty Lines", self.remove_empty_lines)
-
-        # TODO: add an edit meu for removing blank lines, etc.
 
     def open_file(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(
@@ -193,6 +193,8 @@ class CodeRyplDocumentWindow(QMainWindow):
             self.model.save_to_file(self.model.filename)
 
     def save_as(self) -> None:
+
+        # resolve the suggested save as name
         if self.model.isempty():
             suggested_filename = "SaveAs"
         else:
@@ -204,13 +206,16 @@ class CodeRyplDocumentWindow(QMainWindow):
                 print(f"Error resolving suggested filename: {err}")
                 suggested_filename = "SaveAs"
 
-        # open the file dialog
+        # open the file dialog, with a don't save option
         filename, _ = QFileDialog.getSaveFileName(
             self,
             "Save File As",
             str(self._last_export_path / f"{suggested_filename}.rplm"),
             "RPLM Files (*.rplm)",
         )
+
+        if filename == "":  # then save canceled
+            return
 
         path = pathlib.Path(filename)
 
@@ -326,8 +331,11 @@ class CodeRyplDocumentWindow(QMainWindow):
         tab_widget.tabBar().setStyle(QStyleFactory.create("Fusion"))
 
         # --- the player table ---
-        self.player_table = player_table = RplmTableView()
-        self.coach_table = coach_table = RplmTableView()
+        self.player_table = player_table = RplmTableView(Player.num_cols())
+        self.coach_table = coach_table = RplmTableView(
+            Coach.num_cols(),
+            cols_with_completion={2: CoachItemDelegate},
+        )
 
         # add the tables as tabs
         tab_widget.addTab(player_table, "Players")
