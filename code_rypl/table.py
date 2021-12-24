@@ -45,6 +45,9 @@ class RplmTableView(QTableView):
     def _init_format(self):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
+        # copilot suggested code
+        # self.setStyleSheet("QTableView {selection-background-color: #f0f0f0;}")
+
         self.setDragDropMode(QAbstractItemView.DragDrop)
 
         # hide the verical and horizontal headers
