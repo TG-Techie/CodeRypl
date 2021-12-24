@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import functools
 from typing import *
 from typing import TextIO, BinaryIO
 
@@ -357,6 +358,52 @@ class RplmList(Generic[R], QAbstractTableModel):
     def current_rplm(self) -> R:
         return self._data[self._last_used_index.row()]
 
+    def get_rplm_field(self, row: int, col: int) -> str:
+        return self._data[row].get_col(col)
+
+    def get_rplm(self, row: int) -> R:
+        return self._data[row]
+
+    def set_rplm_field(self, row: int, col: int, value) -> None:
+
+        value = value.strip()
+
+        if value == self._data_type.prompt_for_col(col):
+            value = ""
+
+        rplm = self._data[row]
+
+        rplm.set_col(col, value)
+
+    def append(self, rplm: R):
+        self._data.append(rplm)
+        self.refresh()
+
+    def insert(self, row: int, rplm: R) -> None:
+        self._data.insert(row, rplm)
+        self.refresh()
+
+    def refresh(self) -> None:
+        if len(self._data) == 0:
+            self._data.append(self._data_type.empty())  # type: ignore
+        self.layoutChanged.emit()
+
+    def pop(self, row: int) -> R:
+        data = self._data
+        item = data.pop(row)
+        if len(data) == 0:
+            data.append(self._data_type.empty())  # type: ignore
+        self.refresh()
+        return item
+
+    def remove_empty_lines(self) -> None:
+        self._data = data = [r for r in self._data if not r.isempty()]
+        if len(data) == 0:
+            data.append(self._data_type.empty())  # type: ignore
+        self.refresh()
+
+    # === qt / ui interface ===
+
     # QT interface methods
     def rowCount(self, index):
         # The length of the outer list.
@@ -395,48 +442,6 @@ class RplmList(Generic[R], QAbstractTableModel):
             return True
         else:
             raise ValueError(f"{self}.setData({index=}, {value=}, {role=})")
-
-    def get_rplm_field(self, row: int, col: int) -> str:
-        return self._data[row].get_col(col)
-
-    def get_rplm(self, row: int) -> R:
-        return self._data[row]
-
-    def set_rplm_field(self, row: int, col: int, value) -> None:
-
-        value = value.strip()
-
-        if value == self._data_type.prompt_for_col(col):
-            value = ""
-
-        rplm = self._data[row]
-
-        rplm.set_col(col, value)
-
-    def append(self, rplm: R):
-        self._data.append(rplm)
-        self.refresh()
-        # self.set_selected_row(self._last_used_index.siblingAtRow(len(self._data) - 1))
-
-    def insert(self, row: int, rplm: R) -> None:
-        self._data.insert(row, rplm)
-        self.refresh()
-
-    def refresh(self) -> None:
-        self.layoutChanged.emit()
-
-    def pop(self, row: int) -> R:
-        item = self._data.pop(row)
-        if len(self._data) == 0:
-            self.append(self._data_type.empty())  # type: ignore
-        self.refresh()
-        return item
-
-    def remove_empty_lines(self) -> None:
-        self._data = [r for r in self._data if not r.isempty()]
-        self.refresh()
-
-    # === qt / ui interface ===
 
     def flags(self, index):
         return (
