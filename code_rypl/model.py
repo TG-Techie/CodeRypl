@@ -242,7 +242,8 @@ class RplmFile:
 
         assert path.suffix == ".rplm", f"{filename} is not a .rplm file"
 
-        if path.exists():
+        # this is an odd check but i cannot being myself to get rid of it
+        if path.exists() and filename != self.filename:
             blocking_popup(f"{filename} already exists, overwriting")
 
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -309,13 +310,15 @@ class RplmFile:
     def hashstr(self) -> str:
         return hash(
             "|".join(
-                self.school,
-                self.sport,
-                self.category,
-                self.season,
-                self.filename,
-                self.players.hashstr(),
-                self.coaches.hashstr(),
+                (
+                    self.school,
+                    self.sport,
+                    self.category,
+                    self.season,
+                    self.filename,
+                    self.players.hashstr(),
+                    self.coaches.hashstr(),
+                )
             )
         )
 
