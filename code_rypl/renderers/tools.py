@@ -36,6 +36,9 @@ _prepositions = {
 
 
 def normalize_school(school: str) -> str:
+    # capitalize the first letter of each word unless it is
+    # a preposition or there is a capital letter in the word
+
     if school.startswith(":"):
         return ":" + school.lstrip(":").strip()
     else:

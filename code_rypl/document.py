@@ -355,14 +355,9 @@ class CodeRyplDocumentWindow(QMainWindow):
             prompt=suggested_season,
             normalize=renderer_tools.normalize_season,
             suggestions=[suggested_season],
+            suggestion_inline=True,
             on_change=lambda: self.model.set_meta(category=season_input.text()),
         )
-
-        # season_input.returnPressed.connect(
-        #     lambda: season_input.setText(
-        #         suggested_season if (raw := season_input.text()).strip() == "" else raw
-        #     )
-        # )
 
         # add the widgets to the layout
         metalayout.addWidget(school_input)
@@ -379,6 +374,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         on_change: Callable[[], None] | None = None,
         normalize: Callable[[str], str] | None = None,
         suggestions: Iterable[str] | None = None,
+        suggestion_inline: bool = False,
     ) -> QLineEdit:
 
         widget = QLineEdit("")
@@ -401,7 +397,11 @@ class CodeRyplDocumentWindow(QMainWindow):
             completer.setCaseSensitivity(Qt.CaseInsensitive)
 
             # make the complete show on focus
-            completer.setCompletionMode(QCompleter.PopupCompletion)
+            if suggestion_inline:
+                completer.setCompletionMode(QCompleter.InlineCompletion)
+            else:
+                completer.setCompletionMode(QCompleter.PopupCompletion)
+            # completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
 
             # TODO: to show the completer on focus override the focusChanged method
             # on the app and pass a callback down to this
