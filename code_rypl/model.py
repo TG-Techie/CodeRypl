@@ -316,18 +316,14 @@ class RplmFile:
 
     def export_into(self, file: TextIO, *, renderer: RplmFileRenderer) -> None:
 
-        remove_colons: Callable[[dict[str, str]], dict[str, str]] = lambda dct: {
-            k: v.lstrip(":") for k, v in dct.items()
-        }
-
         file.writelines(
-            renderer.render_player(**remove_colons(player.as_fields())) + "\n"
+            renderer.render_player(**player.as_fields()) + "\n"
             for player in self.players
             if not player.isempty()
         )
 
         file.writelines(
-            renderer.render_coach(**remove_colons(coaches.as_fields())) + "\n"
+            renderer.render_coach(**coaches.as_fields()) + "\n"
             for coaches in self.coaches
             if not coaches.isempty()
         )
