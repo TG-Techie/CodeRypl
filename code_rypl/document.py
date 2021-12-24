@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import pathlib
+import time
 
 from typing import *
 
@@ -9,10 +10,8 @@ from .model import RplmFile, RplmList, blocking_popup
 from .table import RplmTableView
 
 # import the necessary modules
-import PySide6 as pyside
-from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtGui import QFontMetrics
-
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget,
     QMainWindow,
@@ -22,7 +21,13 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QTabWidget,
     QMenuBar,
+    QCompleter,
+    QStyleFactory,
+    QFileDialog,
 )
+
+from .renderers import tools as renderer_tools
+
 
 if TYPE_CHECKING:
     from .app import CodeRyplApplication
@@ -110,7 +115,7 @@ class CodeRyplMenuBar(QMenuBar):
         # TODO: add an edit meu for removing blank lines, etc.
 
     def open_file(self) -> None:
-        filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+        filename, _ = QFileDialog.getOpenFileName(
             self, "Open File", "", "RPLM Files (*.rplm)"
         )
 
@@ -145,28 +150,14 @@ class CodeRyplDocumentWindow(QMainWindow):
 
         self.init_layout()
 
-        model = RplmFile.untitled() if filename is None else RplmFile.open(filename)
-        self.load_file_model(model)
+        self.load_file_model(
+            RplmFile.untitled() if filename is None else RplmFile.open(filename)
+        )
 
         # file export state
         self._last_export_path = (
             pathlib.Path.home() if filename is None else pathlib.Path(filename).parent
         )
-
-    def load_file_model(self, model: RplmFile) -> None:
-
-        self.model = model
-        self.setWindowTitle(
-            f"CodeRyple - {'Untitled.rplm' if model.filename is None else model.filename}"
-        )
-
-        self.coach_table.load_rplm_list(model.coaches)
-        self.player_table.load_rplm_list(model.players)
-
-        self.school_input.setText(model.school)
-        self.sport_input.setText(model.sport)
-        self.category_input.setText(model.category)
-        self.season_input.setText(model.season)
 
     def get_focused_table(self) -> None | RplmTableView:
         if self.coach_table.hasFocus():
@@ -199,7 +190,7 @@ class CodeRyplDocumentWindow(QMainWindow):
                 suggested_filename = "SaveAs"
 
         # open the file dialog
-        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+        filename, _ = QFileDialog.getSaveFileName(
             self,
             "Save File As",
             str(self._last_export_path / f"{suggested_filename}.rplm"),
@@ -236,7 +227,7 @@ class CodeRyplDocumentWindow(QMainWindow):
             exportname = self._resolve_suggested_filename(renderer, "Untitled") + ".txt"
 
             # promot the user to select a file
-            raw_exportpath, _ = QtWidgets.QFileDialog.getSaveFileName(
+            raw_exportpath, _ = QFileDialog.getSaveFileName(
                 self,
                 caption="Export File",
                 dir=str(self._last_export_path / exportname),
@@ -317,7 +308,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         tab_widget.tabBar().setDocumentMode(True)
         tab_widget.tabBar().setExpanding(True)
         # TODO: make the selected tab color a little better, but fine for now
-        tab_widget.tabBar().setStyle(QtWidgets.QStyleFactory.create("Fusion"))
+        tab_widget.tabBar().setStyle(QStyleFactory.create("Fusion"))
 
         # --- the player table ---
         self.player_table = player_table = RplmTableView()
@@ -337,38 +328,35 @@ class CodeRyplDocumentWindow(QMainWindow):
 
         # make the inputs
         # TODO: make the default values based on teh laoded file_modle
-        self.school_input = school_input = QLineEdit("")
-        school_input.setPlaceholderText("School of Name")
-        school_input.setFixedHeight(
-            int(QFontMetrics(school_input.font()).height() * 1.8)
-        )
-        school_input.textEdited.connect(
-            lambda: self.model.set_meta(school=school_input.text())
+        self.school_input = school_input = self._make_metatext_input(
+            prompt="School of Name",
+            normalize=renderer_tools.normalize_school,
+            on_change=lambda: self.model.set_meta(school=school_input.text()),
         )
 
-        self.sport_input = sport_input = QLineEdit("")
-        sport_input.setPlaceholderText("SportsBall")
-        sport_input.setFixedHeight(int(QFontMetrics(sport_input.font()).height() * 1.8))
-        sport_input.textEdited.connect(
-            lambda: self.model.set_meta(sport=sport_input.text())
+        self.sport_input = sport_input = self._make_metatext_input(
+            prompt="SportsBall",
+            suggestions=renderer_tools.sport_abrev_to_formal_name.values(),
+            normalize=renderer_tools.normalize_sports,
+            on_change=lambda: self.model.set_meta(sport=sport_input.text()),
         )
 
-        self.category_input = category_input = QLineEdit("")
-        category_input.setPlaceholderText("mens, womens, etc")
-        category_input.setFixedHeight(
-            int(QFontMetrics(category_input.font()).height() * 1.8)
-        )
-        category_input.textEdited.connect(
-            lambda: self.model.set_meta(category=category_input.text())
+        self.category_input = category_input = self._make_metatext_input(
+            prompt="Men's, Women's, etc",
+            suggestions=renderer_tools.category_formal_to_variations,
+            normalize=renderer_tools.normalize_category,
+            on_change=lambda: self.model.set_meta(category=category_input.text()),
         )
 
-        self.season_input = season_input = QLineEdit("")
-        season_input.setPlaceholderText("year")
-        season_input.setFixedHeight(
-            int(QFontMetrics(season_input.font()).height() * 1.8)
-        )
-        season_input.textEdited.connect(
-            lambda: self.model.set_meta(season=season_input.text())
+        this_year = time.localtime().tm_year
+        suggested_season = f"{this_year:04}-{(this_year+1)%100:02}"
+
+        self.season_input = season_input = self._make_metatext_input(
+            prompt=suggested_season,
+            normalize=renderer_tools.normalize_season,
+            suggestions=[suggested_season],
+            suggestion_inline=True,
+            on_change=lambda: self.model.set_meta(category=season_input.text()),
         )
 
         # add the widgets to the layout
@@ -378,3 +366,69 @@ class CodeRyplDocumentWindow(QMainWindow):
         metalayout.addWidget(season_input)
 
         return metalayout
+
+    def _make_metatext_input(
+        self,
+        *,
+        prompt: str,
+        on_change: Callable[[], None] | None = None,
+        normalize: Callable[[str], str] | None = None,
+        suggestions: Iterable[str] | None = None,
+        suggestion_inline: bool = False,
+    ) -> QLineEdit:
+
+        widget = QLineEdit("")
+        metrics = QFontMetrics(widget.font())
+        widget.setPlaceholderText(prompt)
+        widget.setFixedHeight(int(metrics.height() * 1.8))
+
+        if on_change is not None:
+            widget.textChanged.connect(on_change)
+
+        if normalize is not None:
+            widget.editingFinished.connect(
+                lambda: widget.setText(normalize(widget.text()))
+            )
+
+        if suggestions is not None:
+            # make a completer
+            completer = QCompleter(list(suggestions))
+            # set the completer to be case insensitive
+            completer.setCaseSensitivity(Qt.CaseInsensitive)
+
+            # make the complete show on focus
+            if suggestion_inline:
+                completer.setCompletionMode(QCompleter.InlineCompletion)
+            else:
+                completer.setCompletionMode(QCompleter.PopupCompletion)
+            # completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
+
+            # TODO: to show the completer on focus override the focusChanged method
+            # on the app and pass a callback down to this
+            # (or something like enviroment variable)
+
+            # fuzzy matching
+            completer.setFilterMode(Qt.MatchContains)
+            # set the completer
+            widget.setCompleter(completer)
+
+        return widget
+
+    def load_file_model(self, model: RplmFile) -> None:
+
+        self.model = model
+        self.setWindowTitle(
+            f"CodeRyple - {'Untitled.rplm' if model.filename is None else model.filename}"
+        )
+
+        self.coach_table.load_rplm_list(model.coaches)
+        self.player_table.load_rplm_list(model.players)
+
+        if len(model.school):
+            self.school_input.setText(model.school)
+        if len(model.sport):
+            self.sport_input.setText(model.sport)
+        if len(model.category):
+            self.category_input.setText(model.category)
+        if len(model.season):
+            self.season_input.setText(model.season)

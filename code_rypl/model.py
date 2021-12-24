@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import sys
-import functools
+import time
+
 from typing import *
 from typing import TextIO, BinaryIO
 
@@ -156,6 +156,14 @@ class RplmFile:
 
     metadata_spec: ClassVar[set[str]] = {"school", "sport", "category", "season"}
 
+    filename: None | str
+    school: str
+    sport: str
+    category: str
+    season: str
+    players: RplmList[Player]
+    coaches: RplmList[Coach]
+
     def __init__(
         self,
         *,
@@ -166,7 +174,7 @@ class RplmFile:
         season: str = "",
         players: Iterable[Player] | None = None,
         coaches: Iterable[Coach] | None = None,
-        set_selected_cell: Callable[[QModelIndex], None] = None,
+        set_selected_cell: Callable[[QModelIndex], None] | None = None,
     ) -> None:
         super().__init__()
 
