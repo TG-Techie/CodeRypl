@@ -46,24 +46,24 @@ class Rplm:
             raise TypeError("cannot instantiate abstract class Rplm")
         return object.__new__(cls)
 
-    def __init__(self, **kwargs: str) -> None:
+    def __init__(self, **fields: str) -> None:
 
         spec = self.field_spec
 
         assert (
-            len(extras := set(kwargs) - set(spec)) == 0
+            len(extras := set(fields) - set(spec)) == 0
         ), f"unexpedted kwargs: {extras}"
 
         assert (
-            len(missing := set(spec) - set(kwargs)) == 0
+            len(missing := set(spec) - set(fields)) == 0
         ), f"missing kwargs: {missing}"
 
-        assert set(spec) == set(kwargs), (
-            f"argument errors, got {set(kwargs)}, "
+        assert set(spec) == set(fields), (
+            f"argument errors, got {set(fields)}, "
             "however this assert should not have been reached, please report this bug"
         )
 
-        self._cols = {spec[f]: kwargs[f] for f in kwargs}
+        self._cols = {spec[f]: fields[f] for f in fields}
 
     @classmethod
     def from_cols(self: Type[R], *args: str) -> R:
@@ -71,9 +71,6 @@ class Rplm:
             self.field_spec
         ), f"expected {len(self.field_spec)}, got {len(args)}"
         return self(**{f: args[col] for f, col in self.field_spec.items()})
-
-    def as_cols(self) -> tuple[str, ...]:
-        return tuple(self._cols[col] for col in range(self.num_cols()))
 
     def get_col(self, col: int) -> str:
         return self._cols[col]
@@ -83,6 +80,9 @@ class Rplm:
 
     def field(self, name: str) -> str:
         return self._cols[self.field_spec[name]]
+
+    def as_cols(self) -> tuple[str, ...]:
+        return tuple(self._cols[col] for col in range(self.num_cols()))
 
     def as_fields(self) -> dict[str, str]:
         return {f: self.field(f) for f in self.field_spec}
@@ -146,7 +146,8 @@ class CoachAsDict(TypedDict):
     kind: str
 
 
-class SaveDict(TypedDict):
+class SaveEncoding(TypedDict):
+    version: int
     meta: MetaAsDict
     players: tuple[PlayerAsDict, ...]
     coaches: tuple[CoachAsDict, ...]
@@ -243,11 +244,17 @@ class RplmFile:
         # TODO: add hash to see if the file has changed
         msgpack.pack(data, into)
 
-    def _to_save_dict(self) -> SaveDict:
-        return SaveDict(
-            meta=self.meta_as_dict(),
-            players=tuple(p.as_fields() for p in self.players),  # type: ignore
-            coaches=tuple(c.as_fields() for c in self.coaches),  # type: ignore
+    def _to_save_dict(self) -> SaveEncoding:
+        # 0 = dict for players and coaches and meta, (no version entry)
+        # 1 = dict for just meta, version entry, tuple of tuples for players and coaches
+        # === FUTURE ===
+        # 2 = tuple of tuple for meta, rename to 'shared' or 'header' data
+        # 3 = add actual meta-data in a meata_data field (content tbd)
+        return SaveEncoding(
+            version=1,  # TODO: add versioning, 0 = dict for players and coaches, 1 = dict for just meta
+            meta=self.meta_as_dict(),  # TODO: make this a tuple of tuples instead (hashable)
+            players=tuple(p.as_cols() for p in self.players),  # type: ignore
+            coaches=tuple(c.as_cols() for c in self.coaches),  # type: ignore
         )
 
     @classmethod
@@ -267,15 +274,34 @@ class RplmFile:
         ), f"missing meta fields: {set(cls.metadata_spec) - set(meta)}"
 
         assert "players" in data, f"missing players section in {file}"
-        players: list[PlayerAsDict] = data["players"]
+        raw_players: list[PlayerAsDict] = data["players"]
+
+        if len(raw_players) == 0:
+            players = ()
+        elif isinstance(raw_players[0], dict):
+            players = (Player(**p) for p in raw_players)
+            blocking_popup(f"{file} is an old format, save to convert to new format")
+        elif isinstance(raw_players[0], (list, tuple)):
+            players = (Player.from_cols(p) for p in raw_players)
+        else:
+            raise RuntimeError(f"unknown type for players: {type(raw_players[0])}")
 
         assert "coaches" in data, f"missing coaches section in {file}"
-        coaches: List[CoachAsDict] = data["coaches"]
+        raw_coaches: list[CoachAsDict] = data["coaches"]
+
+        if len(raw_players) == 0:
+            coaches = ()
+        elif isinstance(raw_coaches[0], dict):
+            coaches = (Coach(**c) for c in raw_coaches)
+        elif isinstance(raw_coaches[0], (list, tuple)):
+            coaches = (Coach.from_cols(c) for c in raw_coaches)
+        else:
+            raise RuntimeError(f"unknown type for players: {type(raw_coaches[0])}")
 
         return cls(
             **meta,
-            players=(Player(**p) for p in players),
-            coaches=(Coach(**c) for c in coaches),
+            players=players,
+            coaches=coaches,
             filename=file.name,
         )
 
