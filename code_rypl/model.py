@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import sys
+import time
 from typing import *
 from typing import TextIO, BinaryIO
 
@@ -155,6 +155,14 @@ class RplmFile:
 
     metadata_spec: ClassVar[set[str]] = {"school", "sport", "category", "season"}
 
+    filename: None | str
+    school: str
+    sport: str
+    category: str
+    season: str
+    players: RplmList[Player]
+    coaches: RplmList[Coach]
+
     def __init__(
         self,
         *,
@@ -165,7 +173,7 @@ class RplmFile:
         season: str = "",
         players: Iterable[Player] | None = None,
         coaches: Iterable[Coach] | None = None,
-        set_selected_cell: Callable[[QModelIndex], None] = None,
+        set_selected_cell: Callable[[QModelIndex], None] | None = None,
     ) -> None:
         super().__init__()
 
@@ -307,14 +315,18 @@ class RplmFile:
 
     def export_into(self, file: TextIO, *, renderer: RplmFileRenderer) -> None:
 
+        remove_colons: Callable[[dict[str, str]], dict[str, str]] = lambda dct: {
+            k: v.lstrip(":") for k, v in dct.items()
+        }
+
         file.writelines(
-            renderer.render_player(**player.as_fields()) + "\n"
+            renderer.render_player(**remove_colons(player.as_fields())) + "\n"
             for player in self.players
             if not player.isempty()
         )
 
         file.writelines(
-            renderer.render_coach(**coaches.as_fields()) + "\n"
+            renderer.render_coach(**remove_colons(coaches.as_fields())) + "\n"
             for coaches in self.coaches
             if not coaches.isempty()
         )
