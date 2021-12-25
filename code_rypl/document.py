@@ -13,6 +13,7 @@ from .table import RplmTableView
 from PySide6.QtGui import QFontMetrics
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
+    QMessageBox,
     QWidget,
     QMainWindow,
     QVBoxLayout,
@@ -256,9 +257,27 @@ class CodeRyplDocumentWindow(QMainWindow):
         self.setWindowTitle(f"CodeRyple - {self._title}{edit_msg}")
 
     def close(self) -> bool:
+        print("entering closing procedure")
         # TDOD: add change check and skip save if it has not changed
         # TODO: add a confirmation dialog
-        self.save()
+        if self.model.changed():
+            # make a popup to ask if they want to save
+            popup = QMessageBox(self)
+            popup.setText("Save changes before closing?")
+            popup.setStandardButtons(
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
+            )
+            popup.setDefaultButton(QMessageBox.Save)
+            popup.setWindowTitle("Unsaved Changes")
+            popup.setIcon(QMessageBox.Warning)
+            choice = popup.exec_()
+            # if they choose to save, save
+            if choice == QMessageBox.Save:
+                self.save()
+            elif choice == QMessageBox.Cancel:
+                return False
+            else:
+                blocking_popup("Unsaved changes discarded")
         return super().close()
 
     def export_replacements(self):
@@ -281,9 +300,9 @@ class CodeRyplDocumentWindow(QMainWindow):
             if raw_exportpath in {None, ""}:
                 raise ExportError("No file selected")
             if exportpath.exists() and not exportpath.is_file():
-                raise ExportError("Export path is not a file")
+                raise ExportError("Export path is not a file, canceling export")
             if exportpath.suffix != ".txt":
-                raise ExportError("Export path must end in .txt")
+                raise ExportError("Export path must end in .txt, canceling export")
 
             # save it so future exports open at the same location
             self._last_export_path = exportpath.parent
