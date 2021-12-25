@@ -257,9 +257,10 @@ class CodeRyplDocumentWindow(QMainWindow):
         self.setWindowTitle(f"CodeRyple - {self._title}{edit_msg}")
 
     def close(self) -> bool:
-        print("entering closing procedure")
-        # TDOD: add change check and skip save if it has not changed
-        # TODO: add a confirmation dialog
+        if self._check_for_save_on_close():
+            return super().close()
+
+    def _check_for_save_on_close(self) -> None:
         if self.model.changed():
             # make a popup to ask if they want to save
             popup = QMessageBox(self)
@@ -274,11 +275,12 @@ class CodeRyplDocumentWindow(QMainWindow):
             # if they choose to save, save
             if choice == QMessageBox.Save:
                 self.save()
+                return True
             elif choice == QMessageBox.Cancel:
                 return False
             else:
                 blocking_popup("Unsaved changes discarded")
-        return super().close()
+                return True
 
     def export_replacements(self):
         try:
@@ -338,6 +340,10 @@ class CodeRyplDocumentWindow(QMainWindow):
             return default
 
     # === qt / gui setup ===
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self._check_for_save_on_close()
+        return super().closeEvent(event)
 
     def init_layout(self) -> None:
         # setup the base widget and layout
