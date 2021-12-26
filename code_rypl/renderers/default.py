@@ -84,7 +84,7 @@ class RplmFileRenderer:
 
     def suggested_filename(self) -> None | str:
         # TODO(Ryan): Make this a function that return your desired suggested filename
-        return f"{self.call}{strip_escape(self.raw_season)}".upper() + ".txt"
+        return f"{self.call}{strip_escape(self.raw_season)}".upper()
 
     def render_player(self, *, first: str, last: str, num: str, posn: str) -> str:
         """

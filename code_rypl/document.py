@@ -244,7 +244,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         try:
             renderer = ChosenRenderer(**self.model.meta_as_dict())
 
-            exportname = self._resolve_suggested_filename(renderer, "Untitled")
+            exportname = self._resolve_suggested_filename(renderer, "Untitled") + ".txt"
 
             # promot the user to select a file
             dialog = QFileDialog(
@@ -341,10 +341,14 @@ class CodeRyplDocumentWindow(QMainWindow):
         tab_widget.tabBar().setStyle(QStyleFactory.create("Fusion"))
 
         # --- the player table ---
-        self.player_table = player_table = RplmTableView(Player.num_cols())
+        self.player_table = player_table = RplmTableView(
+            Player.num_cols(),
+            num_opt_cols=1,
+        )
         self.coach_table = coach_table = RplmTableView(
             Coach.num_cols(),
             cols_with_completion={2: CoachItemDelegate},
+            num_opt_cols=0,
         )
 
         # add the tables as tabs
