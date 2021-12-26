@@ -67,34 +67,6 @@ def abbv_sex(text: str) -> str:
         raise SexError(f"unkown sex {text!r}, allowed include men, women, and none")
 
 
-def abbv_sport(sport: str) -> str:
-    """
-    Abbreviates a sport name.
-    """
-    matchable = matchify(sport)
-    for abbv, formal in sport_abrev_to_formal_name.items():
-        if matchable in {abbv, matchify(formal)}:
-            return abbv
-    raise SportsAbbreviationError(
-        f"{sport!r} is not a valid sport. valid sports are: {', '.join(map(repr,sorted(sport_abrev_to_formal_name.keys())))}"
-    )
-
-
-def abbv_sex(text: str) -> str:
-
-    normed = norm_or_pass(normalize_category, strip_escape(text))
-
-    print(f"{normed=!r}")
-    if normed == "Men's":
-        return "m"
-    elif normed == "women's":
-        return "w"
-    elif normed == "None":
-        return "n"
-    else:
-        raise SexError(f"unkown sex {text!r}, allowed include men, women, and none")
-
-
 class RplmFileRenderer:
     def __init__(self, *, school: str, sport: str, category: str, season: str) -> None:
 
