@@ -11,8 +11,9 @@ from .table import RplmTableView
 
 # import the necessary modules
 from PySide6.QtGui import QFontMetrics
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
+    QMessageBox,
     QWidget,
     QMainWindow,
     QVBoxLayout,
@@ -28,8 +29,10 @@ from PySide6.QtWidgets import (
 
 from .renderers import tools as renderer_tools
 from .model import Player, Coach
-from .table import CoachItemDelegate
+from .table import ColumnCompleterDelegate
 
+
+UNSAVED_UI_CHECK_INTERVAL = 1000  # milliseconds
 
 if TYPE_CHECKING:
     from .app import CodeRyplApplication
@@ -168,6 +171,15 @@ class CodeRyplDocumentWindow(QMainWindow):
             pathlib.Path.home() if filename is None else pathlib.Path(filename).parent
         )
 
+        self._title_refresh_timer = title_refresh_timer = QTimer(self)
+        title_refresh_timer.setInterval(UNSAVED_UI_CHECK_INTERVAL)
+        title_refresh_timer.timeout.connect(self._title_refresh_handler)
+        title_refresh_timer.start()
+
+    def _title_refresh_handler(self):
+        self._refresh_title()
+        self._title_refresh_timer.start()
+
     def switch_focus(self) -> None:
         # set focus to this window
         self.app.setActiveWindow(self)
@@ -209,7 +221,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         # open the file dialog, with a don't save option
         filename, _ = QFileDialog.getSaveFileName(
             self,
-            "Save File As",
+            "Save File As (.rplm)",
             str(self._last_export_path / f"{suggested_filename}.rplm"),
             "RPLM Files (*.rplm)",
         )
@@ -227,18 +239,54 @@ class CodeRyplDocumentWindow(QMainWindow):
             blocking_popup(f"Error saving file({type(e).__name__}): {e}")
             raise e
 
-        self.rename(str(path))
-
-    def rename(self, name: str) -> None:
-        # alter the data instead of opening a new file
+        # alter the data/rename instead of opening a new file
+        name = str(path)
         self.model.filename = name
-        self.setWindowTitle(f"CodeRyple - {name}")
+        self.model.set_as_saved_now()
+        self.set_window_title(name)
+
+    def set_window_title(self, title: str) -> None:
+        self._title = title.split("/")[-1]
+        self._refresh_title()
+
+    def _refresh_title(self) -> None:
+        edit_msg = (
+            "",
+            " - unsaved edits  ",
+        )[self.model.changed()]
+        self.setWindowTitle(f"CodeRypl - {self._title}{edit_msg}")
 
     def close(self) -> bool:
-        # TDOD: add change check and skip save if it has not changed
-        # TODO: add a confirmation dialog
-        self.save()
-        return super().close()
+        should_close = self._check_for_save_on_close()
+        print(f"{should_close=}")
+        if should_close:
+            return super().close()
+        else:
+            False
+
+    def _check_for_save_on_close(self) -> None:
+        if self.model.changed():
+            # make a popup to ask if they want to save
+            popup = QMessageBox(self)
+            popup.setText("Save changes before closing?")
+            popup.setStandardButtons(
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
+            )
+            popup.setDefaultButton(QMessageBox.Save)
+            popup.setWindowTitle("Unsaved Changes")
+            popup.setIcon(QMessageBox.Warning)
+            choice = popup.exec_()
+            # if they choose to save, save
+            if choice == QMessageBox.Save:
+                self.save()
+                return True
+            elif choice == QMessageBox.Cancel:
+                print("cancel")
+                return False
+            else:
+                blocking_popup("Unsaved changes discarded")
+                return True
+        return False
 
     def export_replacements(self):
         try:
@@ -247,12 +295,22 @@ class CodeRyplDocumentWindow(QMainWindow):
             exportname = self._resolve_suggested_filename(renderer, "Untitled") + ".txt"
 
             # promot the user to select a file
-            raw_exportpath, _ = QFileDialog.getSaveFileName(
-                self,
-                caption="Export File",
-                dir=str(self._last_export_path / exportname),
+            dialog = QFileDialog(
+                caption="Export File (.txt)",
+                directory=str(self._last_export_path / exportname),
                 filter="text files (*.txt)",
             )
+            dialog.setAcceptMode(QFileDialog.AcceptSave)
+            dialog.setDefaultSuffix("txt")
+            dialog.exec()
+            raw_exportpath = dialog.selectedFiles()[0]
+
+            # raw_exportpath, _ = dialog.getSaveFileName(
+            #     self,
+            #     caption="Export File (.txt)",
+            #     dir=str(self._last_export_path / exportname),
+            #     filter="text files (*.txt)",
+            # )
 
             exportpath = pathlib.Path(raw_exportpath)
 
@@ -260,9 +318,9 @@ class CodeRyplDocumentWindow(QMainWindow):
             if raw_exportpath in {None, ""}:
                 raise ExportError("No file selected")
             if exportpath.exists() and not exportpath.is_file():
-                raise ExportError("Export path is not a file")
+                raise ExportError("Export path is not a file, canceling export")
             if exportpath.suffix != ".txt":
-                raise ExportError("Export path must end in .txt")
+                raise ExportError("Export path must end in .txt, canceling export")
 
             # save it so future exports open at the same location
             self._last_export_path = exportpath.parent
@@ -299,6 +357,12 @@ class CodeRyplDocumentWindow(QMainWindow):
 
     # === qt / gui setup ===
 
+    def closeEvent(self, event) -> None:
+        if self._check_for_save_on_close():
+            return super().closeEvent(event)
+        else:
+            event.ignore()
+
     def init_layout(self) -> None:
         # setup the base widget and layout
         self.base_widget = base_widget = QWidget()
@@ -331,10 +395,14 @@ class CodeRyplDocumentWindow(QMainWindow):
         tab_widget.tabBar().setStyle(QStyleFactory.create("Fusion"))
 
         # --- the player table ---
-        self.player_table = player_table = RplmTableView(Player.num_cols())
+        self.player_table = player_table = RplmTableView(
+            Player.num_cols(),
+            num_opt_cols=1,
+        )
         self.coach_table = coach_table = RplmTableView(
             Coach.num_cols(),
-            cols_with_completion={2: CoachItemDelegate},
+            cols_with_completion={2: ColumnCompleterDelegate},
+            num_opt_cols=0,
         )
 
         # add the tables as tabs
@@ -384,7 +452,7 @@ class CodeRyplDocumentWindow(QMainWindow):
             normalize=renderer_tools.normalize_season,
             suggestions=[suggested_season, f":{suggested_season}"],
             suggestion_inline=True,
-            on_change=lambda: self.model.set_meta(category=season_input.text()),
+            on_change=lambda: self.model.set_meta(season=season_input.text()),
         )
 
         # add the widgets to the layout
@@ -401,7 +469,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         prompt: str,
         about_width_of: str | None = None,
         on_change: Callable[[], None] | None = None,
-        normalize: Callable[[str], str] | None = None,
+        normalize: Callable[[str], None | str] | None = None,
         suggestions: Iterable[str] | None = None,
         suggestion_inline: bool = False,
     ) -> QLineEdit:
@@ -423,8 +491,11 @@ class CodeRyplDocumentWindow(QMainWindow):
             widget.textChanged.connect(on_change)
 
         if normalize is not None:
+
             widget.editingFinished.connect(
-                lambda: widget.setText(normalize(widget.text()))
+                lambda: widget.setText(
+                    renderer_tools.norm_or_pass(normalize, widget.text())
+                )
             )
 
         if suggestions is not None:
@@ -436,16 +507,15 @@ class CodeRyplDocumentWindow(QMainWindow):
             # make the complete show on focus
             if suggestion_inline:
                 completer.setCompletionMode(QCompleter.InlineCompletion)
+                completer.setFilterMode(Qt.MatchStartsWith)
             else:
                 completer.setCompletionMode(QCompleter.PopupCompletion)
-            # completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
+                completer.setFilterMode(Qt.MatchContains)
 
             # TODO: to show the completer on focus override the focusChanged method
             # on the app and pass a callback down to this
             # (or something like enviroment variable)
 
-            # fuzzy matching
-            completer.setFilterMode(Qt.MatchContains)
             # set the completer
             widget.setCompleter(completer)
 
@@ -454,8 +524,8 @@ class CodeRyplDocumentWindow(QMainWindow):
     def load_file_model(self, model: RplmFile) -> None:
 
         self.model = model
-        self.setWindowTitle(
-            f"CodeRyple - {'Untitled.rplm' if model.filename is None else model.filename}"
+        self.set_window_title(
+            "Untitled.rplm" if model.filename is None else model.filename
         )
 
         self.coach_table.load_rplm_list(model.coaches)

@@ -9,6 +9,7 @@ import pathlib
 import msgpack  # type: ignore[import]
 
 from .renderers.template import RplmFileRenderer
+from .renderers.tools import normalize_title
 
 from PySide6 import QtGui
 
@@ -64,6 +65,9 @@ class Rplm:
         )
 
         self._cols = {spec[f]: kwargs[f] for f in kwargs}
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self._cols})"
 
     @classmethod
     def from_cols(self: Type[R], *args: str) -> R:
@@ -188,6 +192,8 @@ class RplmFile:
             RplmList([Coach.empty()]) if coaches is None else RplmList(coaches)
         )
 
+        coaches.add_normalizer(2, normalize_title)
+
         self.school = school
         self.sport = sport
         self.category = category
@@ -210,6 +216,7 @@ class RplmFile:
         self._last_save_hash = hash(self.hashstr())
 
     def changed(self) -> bool:
+        # print(f"changed? {self.hashstr()} {self._last_save_hash}")
         return self._last_save_hash != hash(self.hashstr())
 
     @property
@@ -315,7 +322,7 @@ class RplmFile:
                     self.sport,
                     self.category,
                     self.season,
-                    self.filename,
+                    str(self.filename),
                     self.players.hashstr(),
                     self.coaches.hashstr(),
                 )
@@ -355,9 +362,9 @@ class RplmFile:
         )
 
         file.writelines(
-            renderer.render_coach(**coaches.as_fields()) + "\n"
-            for coaches in self.coaches
-            if not coaches.isempty()
+            renderer.render_coach(**coach.as_fields()) + "\n"
+            for coach in self.coaches
+            if (not coach.isempty(), print(coach))[0]
         )
 
     def remove_empty_lines(self) -> None:
@@ -370,18 +377,31 @@ class RplmList(Generic[R], QAbstractTableModel):
         self,
         data: Iterable[R],
         set_selected_cell: Callable[[QModelIndex], None] = None,
+        normalizers: dict[int, Callable[[str], str]] = {},
     ):
         super().__init__()
 
         self._data = list(data)
         assert len(self._data) > 0, f"cannot create an empty RplmList"
 
-        self._data_type = type(self._data[0])
+        self._data_type = data_type = type(self._data[0])
+
+        if len(normalizers) > 0:
+            assert (
+                max(normalizers) < data_type.num_cols()
+            ), f"normalizers contain columns out of range, such include {set(n for n in normalizers if n > data_type.num_cols())}"
+
+        self._normalizers = normalizers
 
         # live settable attr
         self.set_selected_cell: Callable[[QModelIndex], None] = (
             (lambda _: None) if set_selected_cell is None else set_selected_cell
         )
+
+    def add_normalizer(self, col: int, normalizer: Callable[[str], str]) -> None:
+        assert col < self._data_type.num_cols(), f"column {col} out of range"
+        assert col not in self._normalizers, f"column {col} already has a normalizer"
+        self._normalizers[col] = normalizer
 
     def isempty(self) -> bool:
         return len(self._data) == 0 or all(d.isempty() for d in self._data)
@@ -419,7 +439,9 @@ class RplmList(Generic[R], QAbstractTableModel):
 
         rplm = self._data[row]
 
-        rplm.set_col(col, value)
+        normed_value = self._normalizers.get(col, lambda _: _)(value)
+
+        rplm.set_col(col, value if normed_value is None else normed_value)
 
     def append(self, rplm: R):
         self._data.append(rplm)

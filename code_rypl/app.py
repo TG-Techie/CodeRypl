@@ -22,6 +22,12 @@ class CodeRyplApplication(QApplication):
         document.show()
         return document
 
+    def closeEvent(self, event) -> None:
+        print("Closing all documents")
+        for document in self._documents:
+            document.close()
+        super().closeEvent(event)
+
     def run(self) -> NoReturn:
         sys.exit(self.exec())
 

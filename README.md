@@ -8,5 +8,5 @@ A code-replacements graphical user interface to make editing replacements quick 
 # TODO for later review:
 
 - fix default renderer
+- make the position column of the coache's table auto suggest values already in the kind column
 - add a hash of file contents on save and expose it as `model.are_unsaved_changes()` for prompting to save on / etc (maybe even expose via gui)
-
