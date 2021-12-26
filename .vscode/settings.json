@@ -1,0 +1,19 @@
+{
+    "python.analysis.autoImportCompletions": true,
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--target-version",
+        "py310"
+    ],
+    "python.linting.mypyPath": "mypy",
+    "python.linting.mypyEnabled": true,
+    "python.linting.mypyCategorySeverity.error": "Error",
+    "python.linting.mypyCategorySeverity.note": "Information",
+    "python.linting.mypyArgs": [
+        "--ignore-missing-imports",
+        "--follow-imports=silent",
+        "--show-column-numbers",
+        "--strict-optional",
+        "--show-error-codes"
+    ]
+}
