@@ -11,8 +11,9 @@ from .table import RplmTableView
 
 # import the necessary modules
 from PySide6.QtGui import QFontMetrics
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
+    QMessageBox,
     QWidget,
     QMainWindow,
     QVBoxLayout,
@@ -30,6 +31,8 @@ from .renderers import tools as renderer_tools
 from .model import Player, Coach
 from .table import ColumnCompleterDelegate
 
+
+UNSAVED_UI_CHECK_INTERVAL = 1000  # milliseconds
 
 if TYPE_CHECKING:
     from .app import CodeRyplApplication
@@ -168,6 +171,15 @@ class CodeRyplDocumentWindow(QMainWindow):
             pathlib.Path.home() if filename is None else pathlib.Path(filename).parent
         )
 
+        self._title_refresh_timer = title_refresh_timer = QTimer(self)
+        title_refresh_timer.setInterval(UNSAVED_UI_CHECK_INTERVAL)
+        title_refresh_timer.timeout.connect(self._title_refresh_handler)
+        title_refresh_timer.start()
+
+    def _title_refresh_handler(self):
+        self._refresh_title()
+        self._title_refresh_timer.start()
+
     def switch_focus(self) -> None:
         # set focus to this window
         self.app.setActiveWindow(self)
@@ -227,18 +239,54 @@ class CodeRyplDocumentWindow(QMainWindow):
             blocking_popup(f"Error saving file({type(e).__name__}): {e}")
             raise e
 
-        self.rename(str(path))
-
-    def rename(self, name: str) -> None:
-        # alter the data instead of opening a new file
+        # alter the data/rename instead of opening a new file
+        name = str(path)
         self.model.filename = name
-        self.setWindowTitle(f"CodeRyple - {name}")
+        self.model.set_as_saved_now()
+        self.set_window_title(name)
+
+    def set_window_title(self, title: str) -> None:
+        self._title = title.split("/")[-1]
+        self._refresh_title()
+
+    def _refresh_title(self) -> None:
+        edit_msg = (
+            "",
+            " - unsaved edits  ",
+        )[self.model.changed()]
+        self.setWindowTitle(f"CodeRypl - {self._title}{edit_msg}")
 
     def close(self) -> bool:
-        # TDOD: add change check and skip save if it has not changed
-        # TODO: add a confirmation dialog
-        self.save()
-        return super().close()
+        should_close = self._check_for_save_on_close()
+        print(f"{should_close=}")
+        if should_close:
+            return super().close()
+        else:
+            False
+
+    def _check_for_save_on_close(self) -> None:
+        if self.model.changed():
+            # make a popup to ask if they want to save
+            popup = QMessageBox(self)
+            popup.setText("Save changes before closing?")
+            popup.setStandardButtons(
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
+            )
+            popup.setDefaultButton(QMessageBox.Save)
+            popup.setWindowTitle("Unsaved Changes")
+            popup.setIcon(QMessageBox.Warning)
+            choice = popup.exec_()
+            # if they choose to save, save
+            if choice == QMessageBox.Save:
+                self.save()
+                return True
+            elif choice == QMessageBox.Cancel:
+                print("cancel")
+                return False
+            else:
+                blocking_popup("Unsaved changes discarded")
+                return True
+        return False
 
     def export_replacements(self):
         try:
@@ -270,9 +318,9 @@ class CodeRyplDocumentWindow(QMainWindow):
             if raw_exportpath in {None, ""}:
                 raise ExportError("No file selected")
             if exportpath.exists() and not exportpath.is_file():
-                raise ExportError("Export path is not a file")
+                raise ExportError("Export path is not a file, canceling export")
             if exportpath.suffix != ".txt":
-                raise ExportError("Export path must end in .txt")
+                raise ExportError("Export path must end in .txt, canceling export")
 
             # save it so future exports open at the same location
             self._last_export_path = exportpath.parent
@@ -308,6 +356,12 @@ class CodeRyplDocumentWindow(QMainWindow):
             return default
 
     # === qt / gui setup ===
+
+    def closeEvent(self, event) -> None:
+        if self._check_for_save_on_close():
+            return super().closeEvent(event)
+        else:
+            event.ignore()
 
     def init_layout(self) -> None:
         # setup the base widget and layout
@@ -470,8 +524,8 @@ class CodeRyplDocumentWindow(QMainWindow):
     def load_file_model(self, model: RplmFile) -> None:
 
         self.model = model
-        self.setWindowTitle(
-            f"CodeRyple - {'Untitled.rplm' if model.filename is None else model.filename}"
+        self.set_window_title(
+            "Untitled.rplm" if model.filename is None else model.filename
         )
 
         self.coach_table.load_rplm_list(model.coaches)

@@ -216,6 +216,7 @@ class RplmFile:
         self._last_save_hash = hash(self.hashstr())
 
     def changed(self) -> bool:
+        # print(f"changed? {self.hashstr()} {self._last_save_hash}")
         return self._last_save_hash != hash(self.hashstr())
 
     @property
@@ -321,7 +322,7 @@ class RplmFile:
                     self.sport,
                     self.category,
                     self.season,
-                    self.filename,
+                    str(self.filename),
                     self.players.hashstr(),
                     self.coaches.hashstr(),
                 )
