@@ -384,7 +384,7 @@ class CodeRyplDocumentWindow(QMainWindow):
             normalize=renderer_tools.normalize_season,
             suggestions=[suggested_season, f":{suggested_season}"],
             suggestion_inline=True,
-            on_change=lambda: self.model.set_meta(category=season_input.text()),
+            on_change=lambda: self.model.set_meta(season=season_input.text()),
         )
 
         # add the widgets to the layout
@@ -401,7 +401,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         prompt: str,
         about_width_of: str | None = None,
         on_change: Callable[[], None] | None = None,
-        normalize: Callable[[str], str] | None = None,
+        normalize: Callable[[str], None | str] | None = None,
         suggestions: Iterable[str] | None = None,
         suggestion_inline: bool = False,
     ) -> QLineEdit:
@@ -423,8 +423,11 @@ class CodeRyplDocumentWindow(QMainWindow):
             widget.textChanged.connect(on_change)
 
         if normalize is not None:
+
             widget.editingFinished.connect(
-                lambda: widget.setText(normalize(widget.text()))
+                lambda: widget.setText(
+                    renderer_tools.norm_or_pass(normalize, widget.text())
+                )
             )
 
         if suggestions is not None:
@@ -436,16 +439,15 @@ class CodeRyplDocumentWindow(QMainWindow):
             # make the complete show on focus
             if suggestion_inline:
                 completer.setCompletionMode(QCompleter.InlineCompletion)
+                completer.setFilterMode(Qt.MatchStartsWith)
             else:
                 completer.setCompletionMode(QCompleter.PopupCompletion)
-            # completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
+                completer.setFilterMode(Qt.MatchContains)
 
             # TODO: to show the completer on focus override the focusChanged method
             # on the app and pass a callback down to this
             # (or something like enviroment variable)
 
-            # fuzzy matching
-            completer.setFilterMode(Qt.MatchContains)
             # set the completer
             widget.setCompleter(completer)
 

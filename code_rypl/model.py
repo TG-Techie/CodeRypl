@@ -65,6 +65,9 @@ class Rplm:
 
         self._cols = {spec[f]: kwargs[f] for f in kwargs}
 
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self._cols})"
+
     @classmethod
     def from_cols(self: Type[R], *args: str) -> R:
         assert len(args) == len(
@@ -357,9 +360,9 @@ class RplmFile:
         )
 
         file.writelines(
-            renderer.render_coach(**coaches.as_fields()) + "\n"
-            for coaches in self.coaches
-            if not coaches.isempty()
+            renderer.render_coach(**coach.as_fields()) + "\n"
+            for coach in self.coaches
+            if (not coach.isempty(), print(coach))[0]
         )
 
     def remove_empty_lines(self) -> None:
