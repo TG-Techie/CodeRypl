@@ -148,9 +148,12 @@ def normalize_category(raw_cato: str) -> None | str:
     if isescaped(raw_cato):
         return ":" + strip_escape(raw_cato)
 
-    matchable = matchify(raw_cato).rstrip("s'")
+    matchable = matchify(raw_cato).rstrip("s'").replace(" ", "").replace("-", "")
 
-    for formal, variations in category_formal_to_variations.items():
+    for (
+        formal,
+        variations,
+    ) in category_formal_to_variations.items():
         if matchable in variations:
             return formal
     else:
