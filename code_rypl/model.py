@@ -9,6 +9,7 @@ import pathlib
 import msgpack  # type: ignore[import]
 
 from .renderers.template import RplmFileRenderer
+from .renderers.tools import normalize_title
 
 from PySide6 import QtGui
 
@@ -191,7 +192,7 @@ class RplmFile:
             RplmList([Coach.empty()]) if coaches is None else RplmList(coaches)
         )
 
-        coaches.add_normalizer(2, institutionalize)
+        coaches.add_normalizer(2, normalize_title)
 
         self.school = school
         self.sport = sport
