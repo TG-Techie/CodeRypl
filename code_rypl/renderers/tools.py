@@ -70,7 +70,7 @@ def isescaped(string: str) -> bool:
     return string.startswith(":")
 
 
-def institutionalize(string: str) -> str:
+def normalize_title(string: str) -> str:
     """
     Institutionalizes a school name.
     ---
@@ -124,7 +124,7 @@ def normalize_school(school: str) -> None | str:
     if isescaped(school):
         return ":" + strip_escape(school)
     else:
-        return institutionalize(school)
+        return normalize_title(school)
 
 
 def normalize_sports(sport: str) -> None | str:
@@ -144,11 +144,11 @@ def normalize_sports(sport: str) -> None | str:
 
 
 def normalize_category(raw_cato: str) -> None | str:
-    # if the starts starts with a colon then only stip (including the space after the colon)
+    # if the starts starts with a colon then only strip (including the space after the colon)
     if isescaped(raw_cato):
         return ":" + strip_escape(raw_cato)
 
-    matchable = matchify(raw_cato).lstrip("'s")
+    matchable = matchify(raw_cato).rstrip("s'")
 
     for formal, variations in category_formal_to_variations.items():
         if matchable in variations:
@@ -158,18 +158,21 @@ def normalize_category(raw_cato: str) -> None | str:
 
 
 def normalize_season(season: str) -> None | str:
-    if season.startswith(":"):
-        return ":" + season.lstrip(":").strip()
+    return None
+    
+    # if season.startswith(":"):
+    #     return ":" + season.lstrip(":").strip()
 
-    end_raw: str | None
-    if "-" in season:
-        start_raw, end_raw = filter(None, season.split("-"))
-    else:
-        start_raw, end_raw = season, None
+    # end_raw: str | None
+    # if "-" in season:
+    #     start_raw, end_raw = filter(None, season.split("-"))
+    # else:
+    #     start_raw, end_raw = season, None
 
-    start = start_raw.strip()
+    # start = start_raw.strip()
 
-    if end_raw is None and len(start) == 4 and start.isnumeric():
-        return f"{start}-{(int(start)+1)%100:02}"
-    else:
-        return None
+    # if end_raw is None and len(start) == 4 and start.isnumeric():
+    #     return f"{start}-{(int(start)+1)%100:02}"
+    # else:
+    #     return None
+    

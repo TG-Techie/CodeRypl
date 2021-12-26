@@ -5,7 +5,7 @@ from .tools import (
     isescaped,
     strip_escape,
     abbreviate,
-    institutionalize,
+    normalize_title,
     remove_prepositions,
     normalize_category,
     sport_abrev_to_formal_name,
@@ -70,7 +70,7 @@ def abbv_sex(text: str) -> str:
 class RplmFileRenderer:
     def __init__(self, *, school: str, sport: str, category: str, season: str) -> None:
 
-        self.inst_school = inst_school = institutionalize(school)
+        self.inst_school = inst_school = normalize_title(school)
         self.school_abbv = school_abbv = abbreviate(inst_school)
         self.sport_abbv = sport_abbv = abbv_sport(sport)
         self.sex = sex_abbv = abbv_sex(category)
