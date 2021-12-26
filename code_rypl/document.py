@@ -209,7 +209,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         # open the file dialog, with a don't save option
         filename, _ = QFileDialog.getSaveFileName(
             self,
-            "Save File As",
+            "Save File As (.rplm)",
             str(self._last_export_path / f"{suggested_filename}.rplm"),
             "RPLM Files (*.rplm)",
         )
@@ -244,15 +244,25 @@ class CodeRyplDocumentWindow(QMainWindow):
         try:
             renderer = ChosenRenderer(**self.model.meta_as_dict())
 
-            exportname = self._resolve_suggested_filename(renderer, "Untitled") + ".txt"
+            exportname = self._resolve_suggested_filename(renderer, "Untitled")
 
             # promot the user to select a file
-            raw_exportpath, _ = QFileDialog.getSaveFileName(
-                self,
-                caption="Export File",
-                dir=str(self._last_export_path / exportname),
+            dialog = QFileDialog(
+                caption="Export File (.txt)",
+                directory=str(self._last_export_path / exportname),
                 filter="text files (*.txt)",
             )
+            dialog.setAcceptMode(QFileDialog.AcceptSave)
+            dialog.setDefaultSuffix("txt")
+            dialog.exec()
+            raw_exportpath = dialog.selectedFiles()[0]
+
+            # raw_exportpath, _ = dialog.getSaveFileName(
+            #     self,
+            #     caption="Export File (.txt)",
+            #     dir=str(self._last_export_path / exportname),
+            #     filter="text files (*.txt)",
+            # )
 
             exportpath = pathlib.Path(raw_exportpath)
 
