@@ -124,7 +124,6 @@ class RplmFileRenderer:
         num = strip_escape(num)
         posn = strip_escape(posn)
 
-
         # append comma to position if present
         fmtd_posn = f"{posn}, " if len(posn) else ""
 
