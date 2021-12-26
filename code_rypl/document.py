@@ -262,9 +262,9 @@ class CodeRyplDocumentWindow(QMainWindow):
         if should_close:
             return super().close()
         else:
-            False
+            return False
 
-    def _check_for_save_on_close(self) -> None:
+    def _check_for_save_on_close(self) -> bool:
         if self.model.changed():
             # make a popup to ask if they want to save
             popup = QMessageBox(self)
@@ -275,7 +275,7 @@ class CodeRyplDocumentWindow(QMainWindow):
             popup.setDefaultButton(QMessageBox.Save)
             popup.setWindowTitle("Unsaved Changes")
             popup.setIcon(QMessageBox.Warning)
-            choice = popup.exec_()
+            choice = popup.exec()
             # if they choose to save, save
             if choice == QMessageBox.Save:
                 self.save()
@@ -284,8 +284,21 @@ class CodeRyplDocumentWindow(QMainWindow):
                 print("cancel")
                 return False
             else:
-                blocking_popup("Unsaved changes discarded")
-                return True
+                double_check = QMessageBox(self)
+                double_check.setText(
+                    "Are you sure you want to quit and discard all changes?"
+                )
+                double_check.setStandardButtons(
+                    QMessageBox.Cancel | QMessageBox.Discard
+                )
+                double_check.setWindowTitle("Are you sure?")
+                double_check.setDefaultButton(QMessageBox.Cancel)
+                double_check.setIcon(QMessageBox.Warning)
+                check = double_check.exec()
+                if check == QMessageBox.Cancel:
+                    return False
+                elif check == QMessageBox.Discard:
+                    return True
         return False
 
     def export_replacements(self):
@@ -483,7 +496,10 @@ class CodeRyplDocumentWindow(QMainWindow):
 
         if about_width_of is not None:
             widget.setFixedWidth(
-                QFontMetrics(widget.font()).boundingRect(about_width_of).width() * 1.25
+                int(
+                    QFontMetrics(widget.font()).boundingRect(about_width_of).width()
+                    * 1.25
+                )
             )
 
         if on_change is not None:
