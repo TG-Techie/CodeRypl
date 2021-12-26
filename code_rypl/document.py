@@ -254,11 +254,15 @@ class CodeRyplDocumentWindow(QMainWindow):
             "",
             " - unsaved edits  ",
         )[self.model.changed()]
-        self.setWindowTitle(f"CodeRyple - {self._title}{edit_msg}")
+        self.setWindowTitle(f"CodeRypl - {self._title}{edit_msg}")
 
     def close(self) -> bool:
-        if self._check_for_save_on_close():
+        should_close = self._check_for_save_on_close()
+        print(f"{should_close=}")
+        if should_close:
             return super().close()
+        else:
+            False
 
     def _check_for_save_on_close(self) -> None:
         if self.model.changed():
@@ -277,10 +281,12 @@ class CodeRyplDocumentWindow(QMainWindow):
                 self.save()
                 return True
             elif choice == QMessageBox.Cancel:
+                print("cancel")
                 return False
             else:
                 blocking_popup("Unsaved changes discarded")
                 return True
+        return False
 
     def export_replacements(self):
         try:
@@ -341,9 +347,11 @@ class CodeRyplDocumentWindow(QMainWindow):
 
     # === qt / gui setup ===
 
-    def closeEvent(self, event: QCloseEvent) -> None:
-        self._check_for_save_on_close()
-        return super().closeEvent(event)
+    def closeEvent(self, event) -> None:
+        if self._check_for_save_on_close():
+            return super().closeEvent(event)
+        else:
+            event.ignore()
 
     def init_layout(self) -> None:
         # setup the base widget and layout
