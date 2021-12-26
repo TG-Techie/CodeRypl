@@ -91,17 +91,17 @@ class CodeRyplMenuBar(QMenuBar):
 
     def _setup_edit_menu(self) -> None:
         edit_menu = self.addMenu("Edit")
-        # todo: add undo/redo
-        edit_menu.addAction(
-            "Undo",
-            lambda: blocking_popup("Undo not implemented"),
-            "Ctrl+Z",
-        )
-        edit_menu.addAction(
-            "Redo",
-            lambda: blocking_popup("Redo not implemented"),
-            "Ctrl+Shift+Z",
-        )
+        # TODO: consider hwo to add this... maybe!? (pribs need to integrate with RplmList)
+        # edit_menu.addAction(
+        #     "Undo",
+        #     lambda: blocking_popup("Undo not implemented"),
+        #     "Ctrl+Z",
+        # )
+        # edit_menu.addAction(
+        #     "Redo",
+        #     lambda: blocking_popup("Redo not implemented"),
+        #     "Ctrl+Shift+Z",
+        # )
         edit_menu.addAction(
             "About",
             lambda: blocking_popup("About not implemented, but Hi! I'm software."),
