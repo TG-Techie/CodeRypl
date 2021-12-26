@@ -43,9 +43,6 @@ def remove_prepositions(string: str) -> str:
     return " ".join(filter(lambda x: x not in prepositions, string.split()))
 
 
-f"{some_exr}"
-
-
 def abbreviate(string: str) -> str:
     """
     Abbreviates sports names.
