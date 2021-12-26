@@ -85,7 +85,9 @@ class CodeRyplMenuBar(QMenuBar):
         file_menu.addAction("Save", self.doc.save, "Ctrl+S")
         file_menu.addAction("Save As", self.doc.save_as, "Ctrl+Shift+S")
         file_menu.addSeparator()
-        # export
+        # imports / export
+        file_menu.addAction("Import from file", self.import_from_file, "Ctrl+Shift+I")
+        file_menu.addAction("Import from URL", self.import_from_url, "Ctrl+Shift+U")
         file_menu.addAction("Export", self.doc.export_replacements, "Ctrl+Shift+E")
         file_menu.addAction("Close", self.doc.close, "Ctrl+W")
 
@@ -118,6 +120,7 @@ class CodeRyplMenuBar(QMenuBar):
         edit_menu.addAction("Remove Empty Lines", self.remove_empty_lines)
 
     def open_file(self) -> None:
+        # TODO: consider adding importable files.. however I probably think those shoudl be seaprate
         filename, _ = QFileDialog.getOpenFileName(
             self, "Open File", str(self.doc._last_export_path), "RPLM Files (*.rplm)"
         )
@@ -141,6 +144,16 @@ class CodeRyplMenuBar(QMenuBar):
 
     def remove_empty_lines(self) -> None:
         self.doc.model.remove_empty_lines()
+
+    def import_from_file(self) -> None:
+
+        blocking_popup("Import from file not implemented yet")
+        return
+
+    def import_from_url(self) -> None:
+
+        blocking_popup("Import from url not implemented yet")
+        return
 
 
 # maybe name this code ryple document?
