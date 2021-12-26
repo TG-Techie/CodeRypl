@@ -96,10 +96,14 @@ class RplmFileRenderer:
         num = strip_escape(num)
         posn = strip_escape(posn)
 
+        fmtd_posn = (
+            f"{posn}, " if len(posn) else ""
+        )  # append comma to position if present
+
         return "\t".join(
             (
                 f"{self.call}{num}",
-                f"{self.inst_school}'s {(posn+', ')*bool(posn)} {first} {last} ({num}), ",
+                f"{self.inst_school}'s {fmtd_posn}{first} {last} ({num}), ",
                 f"{first} {last} ({num}), ",
                 f"{last}",
             )
