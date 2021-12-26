@@ -120,6 +120,7 @@ class CodeRyplMenuBar(QMenuBar):
         edit_menu.addAction("Remove Empty Lines", self.remove_empty_lines)
 
     def open_file(self) -> None:
+        # TODO: consider adding importable files.. however I probably think those shoudl be seaprate
         filename, _ = QFileDialog.getOpenFileName(
             self, "Open File", str(self.doc._last_export_path), "RPLM Files (*.rplm)"
         )
