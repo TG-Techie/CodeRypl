@@ -5,9 +5,64 @@ from typing import *
 
 from .model import *
 
+# TODO: make this import correct once the other branch is merged
+try:
+    from .renderers.tools import institutionalize, abbreviate
+except ImportError:
+
+    prepositions = {
+        "the",
+        "at",
+        "in",
+        "from",
+        "over",
+        "of",
+        "and",
+        "upon",
+        "with",
+        "on",
+        "to",
+        "by",
+    }
+
+    def abbreviate(string: str) -> str:
+        """
+        Abbreviates sports names.
+        """
+        if string.startswith(":"):
+            return ":" + string.lstrip(":").strip()
+
+        return "".join(
+            word[0].lower()  # lowercase first letter
+            for word in string.split()  # for each word
+            if len(word)
+            and word.lower() not in prepositions  # if it is not a preposition
+        )
+
+    def institutionalize(string: str) -> str:
+        """
+        Institutionalizes a school name.
+        ---
+        capitalize the first letter of each word unless it is
+        a preposition or there is a capital letter in the word
+        """
+        return " ".join(
+            map(
+                lambda s: (  # TODO: make this not crap
+                    (s.capitalize() if (s.lower() == s) else s)  # allow for oNeal
+                    if s.lower()
+                    not in prepositions  # lower case it if it is a preposition
+                    else s.lower()
+                ),
+                string.split(),  # remove extra spaces
+            )
+        )
+
+
 from PySide6.QtCore import (
     Qt,
     QEvent,
+    QObject,
 )
 
 from PySide6.QtWidgets import (
@@ -15,6 +70,9 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QAbstractItemView,
     QHeaderView,
+    QStyledItemDelegate,
+    QLineEdit,
+    QCompleter,
 )
 
 # cli args imports
@@ -24,13 +82,81 @@ ENABLE_STAY_ON_INSERT_ABOVE = not (
 ENABLE_MOVE_TO_FIRST_ON_INSERT = not (
     {"--disable-move-to-first-on-insert", "-dis-mtfoi"} & set(sys.argv)
 )
-DISABLE_TAB_WRAP = bool({"--disable-tab-wrap", "-dis-tw"} & set(sys.argv))
+# DISABLE_TAB_WRAP = bool({"--disable-tab-wrap", "-dis-tw"} & set(sys.argv))
+
+
+class ColumnItemDeleagate(QStyledItemDelegate):
+    def __init__(self, table: QTableView, *args: Any, **kwargs: Any) -> None:
+        self._table = table
+        return super().__init__(table, *args, **kwargs)
+
+
+class ColumnCompleter(QCompleter):
+    def __init__(
+        self,
+        completions: Sequence[str],
+        parent: Optional[QObject] = None,
+    ) -> None:
+        self._completions = completions
+        super().__init__(completions, parent)
+        self.setCaseSensitivity(Qt.CaseInsensitive)
+
+        self.setFilterMode(Qt.MatchStartsWith)
+        self.setCompletionMode(QCompleter.InlineCompletion)
+        # self.setFilterMode(Qt.MatchContains)
+        # self.setCompletionMode(QCompleter.PopupCompletion)
+
+    # TODOL when there is on suggestion switch to inline suggestions
+    # def adjust_mode(self, *args) -> None:
+    #     print("adjusting mode", *args)
+    #     completions = self._completions
+    #     if len(completions) == 1:
+    #         self.setFilterMode(Qt.MatchStartsWith)
+    #         self.setCompletionMode(QCompleter.InlineCompletion)
+    #     else:
+    #         self.setFilterMode(Qt.MatchContains)
+    #         self.setCompletionMode(QCompleter.PopupCompletion)
+
+
+class ColumnCompleterDelegate(ColumnItemDeleagate):
+    def createEditor(self, parent, option, index):
+
+        editor = QLineEdit(parent)
+
+        completionlist = self._table._rplm_list.get_col_set(index.column())
+
+        completer = ColumnCompleter(completionlist, parent)
+
+        editor.setCompleter(completer)
+        return editor
+
+
+class CoachItemDelegate(ColumnCompleterDelegate):
+    def createEditor(self, parent, option, index):
+        # TODO: make abreviations to the coach names and expand to the full entry
+        editor = super().createEditor(parent, option, index)
+        editor.editingFinished.connect(
+            lambda: editor.setText(institutionalize(editor.text()))
+        )
+        # completer = editor.completer()
+        # editor.textEdited.connect(lambda: completer.adjust_mode(editor.text()))
+        return editor
 
 
 class RplmTableView(QTableView):
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        num_cols: int,
+        cols_with_completion: dict[int, Type[QStyledItemDelegate]] = {},
+    ) -> None:
         super().__init__(parent=None)
         # self._model: None | RplmFileModel = None
+
+        self._num_cols = num_cols
+
+        for col, delegate_type in cols_with_completion.items():
+            assert col < num_cols, f"col {col} is out of range, has to be < {num_cols}"
+            self.setItemDelegateForColumn(col, delegate_type(self))
 
         self._init_format()
 
@@ -44,6 +170,9 @@ class RplmTableView(QTableView):
 
     def _init_format(self):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        # copilot suggested code
+        # self.setStyleSheet("QTableView {selection-background-color: #f0f0f0;}")
 
         self.setDragDropMode(QAbstractItemView.DragDrop)
 
@@ -82,13 +211,13 @@ class RplmTableView(QTableView):
     def move_right(self):
         index = self.currentIndex()
         self.setCurrentIndex(
-            index.siblingAtColumn((index.column() + 1) % Player.NUM_COLS)
+            index.siblingAtColumn((index.column() + 1) % Player.num_cols())
         )
 
     def move_left(self):
         index = self.currentIndex()
         self.setCurrentIndex(
-            index.siblingAtColumn((index.column() - 1) % Player.NUM_COLS)
+            index.siblingAtColumn((index.column() - 1) % Player.num_cols())
         )
 
     # def _move_to_first_row(self, index: QModelIndex):
@@ -146,15 +275,18 @@ class RplmTableView(QTableView):
         with_option = event.modifiers() & Qt.AltModifier
 
         at_bottom = index.row() == len(self._rplm_list) - 1
-        at_h_hend = index.column() == 3
+        at_h_hend = index.column() == (self._num_cols - 1)
         row_empty = self._rplm_list.get_rplm(index.row()).isempty()
-        cell_empty = self._rplm_list.get_rplm_field(index.row(), index.column()) == ""
+        cell_was_empty = (
+            self._rplm_list.get_rplm_field(index.row(), index.column()) == ""
+        )
 
         if is_delete and with_shift:
             self.remove_selected_row()
             return True
         elif is_delete:
-            self.remove_selected_row()
+            self._rplm_list.get_rplm(index.row()).set_col(index.column(), "")
+            self._rplm_list.refresh()
             return True
         elif is_tab and at_bottom and at_h_hend:
             if row_empty:
@@ -168,10 +300,10 @@ class RplmTableView(QTableView):
             else:
                 self.go(index.row() + 1, 0)
             return True
-        elif is_tab and DISABLE_TAB_WRAP:
+        elif is_tab:
             self.move_right()
             return True
-        elif is_backtab and DISABLE_TAB_WRAP:
+        elif is_backtab:
             self.move_left()
             return True
         elif is_enter:

@@ -27,6 +27,8 @@ from PySide6.QtWidgets import (
 )
 
 from .renderers import tools as renderer_tools
+from .model import Player, Coach
+from .table import CoachItemDelegate
 
 
 if TYPE_CHECKING:
@@ -82,7 +84,7 @@ class CodeRyplMenuBar(QMenuBar):
         file_menu.addSeparator()
         # export
         file_menu.addAction("Export", self.doc.export_replacements, "Ctrl+Shift+E")
-        file_menu.addAction("Close", self.doc.close)
+        file_menu.addAction("Close", self.doc.close, "Ctrl+W")
 
     def _setup_edit_menu(self) -> None:
         edit_menu = self.addMenu("Edit")
@@ -112,15 +114,22 @@ class CodeRyplMenuBar(QMenuBar):
         )
         edit_menu.addAction("Remove Empty Lines", self.remove_empty_lines)
 
-        # TODO: add an edit meu for removing blank lines, etc.
-
     def open_file(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(
-            self, "Open File", "", "RPLM Files (*.rplm)"
+            self, "Open File", str(self.doc._last_export_path), "RPLM Files (*.rplm)"
         )
 
-        # TODO: add a check to see if the file is already open, etc. and use pathlib.Path
-        if self.doc.model.isempty():
+        # TODO: add a proper check to see if the file is already open, using app. swithc focus
+
+        if filename in (
+            (other_doc := d).model.filename for d in self.doc.app._documents
+        ):
+            other_doc.switch_focus()
+            return
+
+        if filename == "":  # then open canceled
+            return
+        elif self.doc.model.isempty():
             self.doc.load_file_model(RplmFile.open(filename))
         elif filename:
             self.doc.app.new_document(filename)
@@ -159,6 +168,12 @@ class CodeRyplDocumentWindow(QMainWindow):
             pathlib.Path.home() if filename is None else pathlib.Path(filename).parent
         )
 
+    def switch_focus(self) -> None:
+        # set focus to this window
+        self.app.setActiveWindow(self)
+        # move the window to the front
+        self.raise_()
+
     def get_focused_table(self) -> None | RplmTableView:
         if self.coach_table.hasFocus():
             return self.coach_table
@@ -178,6 +193,8 @@ class CodeRyplDocumentWindow(QMainWindow):
             self.model.save_to_file(self.model.filename)
 
     def save_as(self) -> None:
+
+        # resolve the suggested save as name
         if self.model.isempty():
             suggested_filename = "SaveAs"
         else:
@@ -189,13 +206,16 @@ class CodeRyplDocumentWindow(QMainWindow):
                 print(f"Error resolving suggested filename: {err}")
                 suggested_filename = "SaveAs"
 
-        # open the file dialog
+        # open the file dialog, with a don't save option
         filename, _ = QFileDialog.getSaveFileName(
             self,
             "Save File As",
             str(self._last_export_path / f"{suggested_filename}.rplm"),
             "RPLM Files (*.rplm)",
         )
+
+        if filename == "":  # then save canceled
+            return
 
         path = pathlib.Path(filename)
 
@@ -311,8 +331,11 @@ class CodeRyplDocumentWindow(QMainWindow):
         tab_widget.tabBar().setStyle(QStyleFactory.create("Fusion"))
 
         # --- the player table ---
-        self.player_table = player_table = RplmTableView()
-        self.coach_table = coach_table = RplmTableView()
+        self.player_table = player_table = RplmTableView(Player.num_cols())
+        self.coach_table = coach_table = RplmTableView(
+            Coach.num_cols(),
+            cols_with_completion={2: CoachItemDelegate},
+        )
 
         # add the tables as tabs
         tab_widget.addTab(player_table, "Players")
@@ -336,6 +359,9 @@ class CodeRyplDocumentWindow(QMainWindow):
 
         self.sport_input = sport_input = self._make_metatext_input(
             prompt="SportsBall",
+            about_width_of=max(
+                renderer_tools.sport_abrev_to_formal_name.values(), key=len
+            ),
             suggestions=renderer_tools.sport_abrev_to_formal_name.values(),
             normalize=renderer_tools.normalize_sports,
             on_change=lambda: self.model.set_meta(sport=sport_input.text()),
@@ -343,6 +369,7 @@ class CodeRyplDocumentWindow(QMainWindow):
 
         self.category_input = category_input = self._make_metatext_input(
             prompt="Men's, Women's, etc",
+            about_width_of=":Women's",
             suggestions=renderer_tools.category_formal_to_variations,
             normalize=renderer_tools.normalize_category,
             on_change=lambda: self.model.set_meta(category=category_input.text()),
@@ -353,8 +380,9 @@ class CodeRyplDocumentWindow(QMainWindow):
 
         self.season_input = season_input = self._make_metatext_input(
             prompt=suggested_season,
+            about_width_of=":0000-00",
             normalize=renderer_tools.normalize_season,
-            suggestions=[suggested_season],
+            suggestions=[suggested_season, f":{suggested_season}"],
             suggestion_inline=True,
             on_change=lambda: self.model.set_meta(season=season_input.text()),
         )
@@ -371,6 +399,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         self,
         *,
         prompt: str,
+        about_width_of: str | None = None,
         on_change: Callable[[], None] | None = None,
         normalize: Callable[[str], None | str] | None = None,
         suggestions: Iterable[str] | None = None,
@@ -380,7 +409,14 @@ class CodeRyplDocumentWindow(QMainWindow):
         widget = QLineEdit("")
         metrics = QFontMetrics(widget.font())
         widget.setPlaceholderText(prompt)
-        widget.setFixedHeight(int(metrics.height() * 1.8))
+        widget.setFixedHeight(int(metrics.height() * 2))
+
+        widget.setStyleSheet("QLineEdit { border-radius: 5%; }")
+
+        if about_width_of is not None:
+            widget.setFixedWidth(
+                QFontMetrics(widget.font()).boundingRect(about_width_of).width() * 1.25
+            )
 
         if on_change is not None:
             widget.textChanged.connect(on_change)
