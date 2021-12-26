@@ -159,7 +159,7 @@ def normalize_category(raw_cato: str) -> None | str:
 
 def normalize_season(season: str) -> None | str:
     return None
-    
+
     # if season.startswith(":"):
     #     return ":" + season.lstrip(":").strip()
 
@@ -175,4 +175,3 @@ def normalize_season(season: str) -> None | str:
     #     return f"{start}-{(int(start)+1)%100:02}"
     # else:
     #     return None
-    
