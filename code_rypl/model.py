@@ -9,6 +9,7 @@ import pathlib
 import msgpack  # type: ignore[import]
 
 from .renderers.template import RplmFileRenderer
+from .renderers.tools import normalize_title
 
 from PySide6 import QtGui
 
@@ -74,6 +75,9 @@ class Rplm:
             self.field_spec
         ), f"expected {len(self.field_spec)}, got {len(args)}"
         return self(**{f: args[col] for f, col in self.field_spec.items()})
+
+    def hashstr(self) -> str:
+        return "({})".format(", ".join(self._cols.values()))
 
     def as_cols(self) -> tuple[str, ...]:
         return tuple(self._cols[col] for col in range(self.num_cols()))
@@ -188,6 +192,8 @@ class RplmFile:
             RplmList([Coach.empty()]) if coaches is None else RplmList(coaches)
         )
 
+        coaches.add_normalizer(2, normalize_title)
+
         self.school = school
         self.sport = sport
         self.category = category
@@ -203,6 +209,14 @@ class RplmFile:
         self.set_selected_cell = (
             set_selected_cell if set_selected_cell is not None else (lambda _: None)
         )
+
+        self._last_save_hash: int | None = None
+
+    def set_as_saved_now(self) -> None:
+        self._last_save_hash = hash(self.hashstr())
+
+    def changed(self) -> bool:
+        return self._last_save_hash != hash(self.hashstr())
 
     @property
     def set_selected_cell(self) -> Callable[[QModelIndex], None]:
@@ -222,7 +236,9 @@ class RplmFile:
         assert path.suffix == ".rplm", f"{filename} is not a .rplm file"
 
         with path.open("rb") as file:
-            return cls._from_file(file)
+            file_model = cls._from_file(file)
+        file_model.set_as_saved_now()
+        return file_model
 
     def save_to_file(self, filename: str) -> None:
         path = pathlib.Path(filename)
@@ -232,7 +248,8 @@ class RplmFile:
 
         assert path.suffix == ".rplm", f"{filename} is not a .rplm file"
 
-        if path.exists():
+        # this is an odd check but i cannot being myself to get rid of it
+        if path.exists() and filename != self.filename:
             blocking_popup(f"{filename} already exists, overwriting")
 
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -240,6 +257,9 @@ class RplmFile:
         with path.open("wb") as file:
             file.truncate(0)
             self._into_file(file)
+
+        if filename == self.filename:
+            self.set_as_saved_now()
 
     def _into_file(self, into: BinaryIO) -> None:
         data = self._to_save_dict()
@@ -293,6 +313,21 @@ class RplmFile:
             and set(m.strip() for m in self.meta_as_dict().values()) == {""}  # type: ignore
         )
 
+    def hashstr(self) -> str:
+        return hash(
+            "|".join(
+                (
+                    self.school,
+                    self.sport,
+                    self.category,
+                    self.season,
+                    self.filename,
+                    self.players.hashstr(),
+                    self.coaches.hashstr(),
+                )
+            )
+        )
+
     def meta_as_dict(self) -> MetaAsDict:
         return dict(
             school=self.school,
@@ -341,21 +376,37 @@ class RplmList(Generic[R], QAbstractTableModel):
         self,
         data: Iterable[R],
         set_selected_cell: Callable[[QModelIndex], None] = None,
+        normalizers: dict[int, Callable[[str], str]] = {},
     ):
         super().__init__()
 
         self._data = list(data)
         assert len(self._data) > 0, f"cannot create an empty RplmList"
 
-        self._data_type = type(self._data[0])
+        self._data_type = data_type = type(self._data[0])
+
+        if len(normalizers) > 0:
+            assert (
+                max(normalizers) < data_type.num_cols()
+            ), f"normalizers contain columns out of range, such include {set(n for n in normalizers if n > data_type.num_cols())}"
+
+        self._normalizers = normalizers
 
         # live settable attr
         self.set_selected_cell: Callable[[QModelIndex], None] = (
             (lambda _: None) if set_selected_cell is None else set_selected_cell
         )
 
+    def add_normalizer(self, col: int, normalizer: Callable[[str], str]) -> None:
+        assert col < self._data_type.num_cols(), f"column {col} out of range"
+        assert col not in self._normalizers, f"column {col} already has a normalizer"
+        self._normalizers[col] = normalizer
+
     def isempty(self) -> bool:
         return len(self._data) == 0 or all(d.isempty() for d in self._data)
+
+    def hashstr(self) -> str:
+        return f"(players:{'|'.join(d.hashstr() for d in self._data)})"
 
     def __len__(self) -> int:
         return len(self._data)
@@ -387,7 +438,9 @@ class RplmList(Generic[R], QAbstractTableModel):
 
         rplm = self._data[row]
 
-        rplm.set_col(col, value)
+        normed_value = self._normalizers.get(col, lambda _: _)(value)
+
+        rplm.set_col(col, value if normed_value is None else normed_value)
 
     def append(self, rplm: R):
         self._data.append(rplm)

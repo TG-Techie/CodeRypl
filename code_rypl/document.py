@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 
 from .renderers import tools as renderer_tools
 from .model import Player, Coach
-from .table import CoachItemDelegate
+from .table import ColumnCompleterDelegate
 
 
 if TYPE_CHECKING:
@@ -347,7 +347,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         )
         self.coach_table = coach_table = RplmTableView(
             Coach.num_cols(),
-            cols_with_completion={2: CoachItemDelegate},
+            cols_with_completion={2: ColumnCompleterDelegate},
             num_opt_cols=0,
         )
 
@@ -433,6 +433,7 @@ class CodeRyplDocumentWindow(QMainWindow):
             )
 
         if on_change is not None:
+            # use textChanged so it saves to the model on every keystroke
             widget.textChanged.connect(on_change)
 
         if normalize is not None:

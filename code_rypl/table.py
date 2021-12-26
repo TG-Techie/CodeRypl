@@ -5,60 +5,6 @@ from typing import *
 
 from .model import *
 
-# TODO: make this import correct once the other branch is merged
-try:
-    from .renderers.tools import institutionalize, abbreviate
-except ImportError:
-
-    prepositions = {
-        "the",
-        "at",
-        "in",
-        "from",
-        "over",
-        "of",
-        "and",
-        "upon",
-        "with",
-        "on",
-        "to",
-        "by",
-    }
-
-    def abbreviate(string: str) -> str:
-        """
-        Abbreviates sports names.
-        """
-        if string.startswith(":"):
-            return ":" + string.lstrip(":").strip()
-
-        return "".join(
-            word[0].lower()  # lowercase first letter
-            for word in string.split()  # for each word
-            if len(word)
-            and word.lower() not in prepositions  # if it is not a preposition
-        )
-
-    def institutionalize(string: str) -> str:
-        """
-        Institutionalizes a school name.
-        ---
-        capitalize the first letter of each word unless it is
-        a preposition or there is a capital letter in the word
-        """
-        return " ".join(
-            map(
-                lambda s: (  # TODO: make this not crap
-                    (s.capitalize() if (s.lower() == s) else s)  # allow for oNeal
-                    if s.lower()
-                    not in prepositions  # lower case it if it is a preposition
-                    else s.lower()
-                ),
-                string.split(),  # remove extra spaces
-            )
-        )
-
-
 from PySide6.QtCore import (
     Qt,
     QEvent,
@@ -121,7 +67,9 @@ class ColumnCompleter(QCompleter):
 class ColumnCompleterDelegate(ColumnItemDeleagate):
     def createEditor(self, parent, option, index):
 
-        editor = QLineEdit(parent)
+        self.editor = editor = QLineEdit(parent)
+
+        editor.installEventFilter(self._table)
 
         completionlist = self._table._rplm_list.get_col_set(index.column())
 
@@ -131,16 +79,14 @@ class ColumnCompleterDelegate(ColumnItemDeleagate):
         return editor
 
 
-class CoachItemDelegate(ColumnCompleterDelegate):
-    def createEditor(self, parent, option, index):
-        # TODO: make abreviations to the coach names and expand to the full entry
-        editor = super().createEditor(parent, option, index)
-        editor.editingFinished.connect(
-            lambda: editor.setText(institutionalize(editor.text()))
-        )
-        # completer = editor.completer()
-        # editor.textEdited.connect(lambda: completer.adjust_mode(editor.text()))
-        return editor
+# class CoachItemDelegate(ColumnCompleterDelegate):
+#     def createEditor(self, parent, option, index):
+#         # TODO: make abreviations to the coach names and expand to the full entry
+#         editor = super().createEditor(parent, option, index)
+#         editor.editingFinished.connect(
+#             lambda: editor.setText((editor.text()))
+#         )
+#         return editor
 
 
 class RplmTableView(QTableView):
@@ -287,6 +233,8 @@ class RplmTableView(QTableView):
         cell_was_empty = (
             self._rplm_list.get_rplm_field(index.row(), index.column()) == ""
         )
+        if is_tab:
+            print("tab")
 
         if is_delete and with_shift:
             self.remove_selected_row()
