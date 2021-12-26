@@ -209,7 +209,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         # open the file dialog, with a don't save option
         filename, _ = QFileDialog.getSaveFileName(
             self,
-            "Save File As",
+            "Save File As (.rplm)",
             str(self._last_export_path / f"{suggested_filename}.rplm"),
             "RPLM Files (*.rplm)",
         )
@@ -247,12 +247,22 @@ class CodeRyplDocumentWindow(QMainWindow):
             exportname = self._resolve_suggested_filename(renderer, "Untitled") + ".txt"
 
             # promot the user to select a file
-            raw_exportpath, _ = QFileDialog.getSaveFileName(
-                self,
-                caption="Export File",
-                dir=str(self._last_export_path / exportname),
+            dialog = QFileDialog(
+                caption="Export File (.txt)",
+                directory=str(self._last_export_path / exportname),
                 filter="text files (*.txt)",
             )
+            dialog.setAcceptMode(QFileDialog.AcceptSave)
+            dialog.setDefaultSuffix("txt")
+            dialog.exec()
+            raw_exportpath = dialog.selectedFiles()[0]
+
+            # raw_exportpath, _ = dialog.getSaveFileName(
+            #     self,
+            #     caption="Export File (.txt)",
+            #     dir=str(self._last_export_path / exportname),
+            #     filter="text files (*.txt)",
+            # )
 
             exportpath = pathlib.Path(raw_exportpath)
 
@@ -331,10 +341,14 @@ class CodeRyplDocumentWindow(QMainWindow):
         tab_widget.tabBar().setStyle(QStyleFactory.create("Fusion"))
 
         # --- the player table ---
-        self.player_table = player_table = RplmTableView(Player.num_cols())
+        self.player_table = player_table = RplmTableView(
+            Player.num_cols(),
+            num_opt_cols=1,
+        )
         self.coach_table = coach_table = RplmTableView(
             Coach.num_cols(),
             cols_with_completion={2: CoachItemDelegate},
+            num_opt_cols=0,
         )
 
         # add the tables as tabs
@@ -384,7 +398,7 @@ class CodeRyplDocumentWindow(QMainWindow):
             normalize=renderer_tools.normalize_season,
             suggestions=[suggested_season, f":{suggested_season}"],
             suggestion_inline=True,
-            on_change=lambda: self.model.set_meta(category=season_input.text()),
+            on_change=lambda: self.model.set_meta(season=season_input.text()),
         )
 
         # add the widgets to the layout
@@ -401,7 +415,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         prompt: str,
         about_width_of: str | None = None,
         on_change: Callable[[], None] | None = None,
-        normalize: Callable[[str], str] | None = None,
+        normalize: Callable[[str], None | str] | None = None,
         suggestions: Iterable[str] | None = None,
         suggestion_inline: bool = False,
     ) -> QLineEdit:
@@ -422,8 +436,11 @@ class CodeRyplDocumentWindow(QMainWindow):
             widget.textChanged.connect(on_change)
 
         if normalize is not None:
+
             widget.editingFinished.connect(
-                lambda: widget.setText(normalize(widget.text()))
+                lambda: widget.setText(
+                    renderer_tools.norm_or_pass(normalize, widget.text())
+                )
             )
 
         if suggestions is not None:
@@ -435,16 +452,15 @@ class CodeRyplDocumentWindow(QMainWindow):
             # make the complete show on focus
             if suggestion_inline:
                 completer.setCompletionMode(QCompleter.InlineCompletion)
+                completer.setFilterMode(Qt.MatchStartsWith)
             else:
                 completer.setCompletionMode(QCompleter.PopupCompletion)
-            # completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
+                completer.setFilterMode(Qt.MatchContains)
 
             # TODO: to show the completer on focus override the focusChanged method
             # on the app and pass a callback down to this
             # (or something like enviroment variable)
 
-            # fuzzy matching
-            completer.setFilterMode(Qt.MatchContains)
             # set the completer
             widget.setCompleter(completer)
 
