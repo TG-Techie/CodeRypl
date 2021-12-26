@@ -209,7 +209,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         # open the file dialog, with a don't save option
         filename, _ = QFileDialog.getSaveFileName(
             self,
-            "Save File As",
+            "Save File As (.rplm)",
             str(self._last_export_path / f"{suggested_filename}.rplm"),
             "RPLM Files (*.rplm)",
         )
@@ -247,12 +247,22 @@ class CodeRyplDocumentWindow(QMainWindow):
             exportname = self._resolve_suggested_filename(renderer, "Untitled") + ".txt"
 
             # promot the user to select a file
-            raw_exportpath, _ = QFileDialog.getSaveFileName(
-                self,
-                caption="Export File",
-                dir=str(self._last_export_path / exportname),
+            dialog = QFileDialog(
+                caption="Export File (.txt)",
+                directory=str(self._last_export_path / exportname),
                 filter="text files (*.txt)",
             )
+            dialog.setAcceptMode(QFileDialog.AcceptSave)
+            dialog.setDefaultSuffix("txt")
+            dialog.exec()
+            raw_exportpath = dialog.selectedFiles()[0]
+
+            # raw_exportpath, _ = dialog.getSaveFileName(
+            #     self,
+            #     caption="Export File (.txt)",
+            #     dir=str(self._last_export_path / exportname),
+            #     filter="text files (*.txt)",
+            # )
 
             exportpath = pathlib.Path(raw_exportpath)
 
@@ -331,10 +341,14 @@ class CodeRyplDocumentWindow(QMainWindow):
         tab_widget.tabBar().setStyle(QStyleFactory.create("Fusion"))
 
         # --- the player table ---
-        self.player_table = player_table = RplmTableView(Player.num_cols())
+        self.player_table = player_table = RplmTableView(
+            Player.num_cols(),
+            num_opt_cols=1,
+        )
         self.coach_table = coach_table = RplmTableView(
             Coach.num_cols(),
             cols_with_completion={2: ColumnCompleterDelegate},
+            num_opt_cols=0,
         )
 
         # add the tables as tabs

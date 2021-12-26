@@ -93,12 +93,16 @@ class RplmTableView(QTableView):
     def __init__(
         self,
         num_cols: int,
+        num_opt_cols: int,  # optional arguments will never not be at end
         cols_with_completion: dict[int, Type[QStyledItemDelegate]] = {},
     ) -> None:
         super().__init__(parent=None)
         # self._model: None | RplmFileModel = None
 
         self._num_cols = num_cols
+
+        # generate indices where enter is allowed to start a newline
+        self._optional_cols = {num_cols - (i + 1) for i in range(num_opt_cols + 1)}
 
         for col, delegate_type in cols_with_completion.items():
             assert col < num_cols, f"col {col} is out of range, has to be < {num_cols}"
@@ -221,7 +225,10 @@ class RplmTableView(QTableView):
         with_option = event.modifiers() & Qt.AltModifier
 
         at_bottom = index.row() == len(self._rplm_list) - 1
-        at_h_hend = index.column() == (self._num_cols - 1)
+        in_opt_col = index.column() in self._optional_cols
+        at_last_col = index.column() == self._num_cols - 1
+
+        # TODO: above line needs to be two variables for proper tab/enter behavior
         row_empty = self._rplm_list.get_rplm(index.row()).isempty()
         cell_was_empty = (
             self._rplm_list.get_rplm_field(index.row(), index.column()) == ""
@@ -236,13 +243,13 @@ class RplmTableView(QTableView):
             self._rplm_list.get_rplm(index.row()).set_col(index.column(), "")
             self._rplm_list.refresh()
             return True
-        elif is_tab and at_bottom and at_h_hend:
+        elif is_tab and at_bottom and at_last_col:
             if row_empty:
                 self.go_col(0)
             else:
                 self.insert_below()
             return True
-        if is_tab and at_h_hend:
+        if is_tab and at_last_col:
             if row_empty:
                 self.go_col(0)
             else:
@@ -264,13 +271,13 @@ class RplmTableView(QTableView):
             elif with_option:
                 self.insert_below()
                 return True
-            elif at_bottom and at_h_hend:
+            elif at_bottom and in_opt_col:
                 if row_empty:
                     self.go_col(0)
                 else:
                     self.insert_below()
                 return True
-            elif at_h_hend:
+            elif in_opt_col:
                 self.move_down()
                 self.go_col(0)
                 return True
