@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 
 from .renderers import tools as renderer_tools
 from .model import Player, Coach
-from .table import CoachItemDelegate
+from .table import ColumnCompleterDelegate
 
 
 if TYPE_CHECKING:
@@ -334,7 +334,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         self.player_table = player_table = RplmTableView(Player.num_cols())
         self.coach_table = coach_table = RplmTableView(
             Coach.num_cols(),
-            cols_with_completion={2: CoachItemDelegate},
+            cols_with_completion={2: ColumnCompleterDelegate},
         )
 
         # add the tables as tabs
