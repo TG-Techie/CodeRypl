@@ -27,10 +27,13 @@ from PySide6.QtWidgets import (
     QFileDialog,
 )
 
+# model imports
 from .renderers import tools as renderer_tools
 from .model import Player, Coach
-from .table import ColumnCompleterDelegate
 
+# ui imports
+from .table import ColumnCompleterDelegate
+from .preferences import PrefWindow
 
 UNSAVED_UI_CHECK_INTERVAL = 1000  # milliseconds
 
@@ -76,6 +79,8 @@ class CodeRyplMenuBar(QMenuBar):
         self._setup_file_menu()
         self._setup_edit_menu()
 
+        self._setup_preferences_menu()
+
     def _setup_file_menu(self) -> None:
         self.file_menu = file_menu = self.addMenu("File")
         file_menu.addAction("New", self.doc.app.new_document, "Ctrl+N")
@@ -116,6 +121,12 @@ class CodeRyplMenuBar(QMenuBar):
             else table.remove_selected_row(),
         )
         edit_menu.addAction("Remove Empty Lines", self.remove_empty_lines)
+
+    def _setup_preferences_menu(self) -> None:
+        self.preferences_menu = preferences_menu = self.addMenu("Preferences")
+        preferences_menu.addAction(
+            "Preferences", self.doc.app.open_preferences, "Ctrl+,"
+        )
 
     def open_file(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(
