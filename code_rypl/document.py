@@ -75,6 +75,12 @@ class CodeRyplMenuBar(QMenuBar):
 
         self._setup_file_menu()
         self._setup_edit_menu()
+        self._setup_about_dialog()
+
+    def _setup_about_dialog(self) -> None:
+        # add an about dialog
+        about = self.addMenu("About")
+        about.addAction("About", lambda: blocking_popup("About not implemented"))
 
     def _setup_file_menu(self) -> None:
         self.file_menu = file_menu = self.addMenu("File")
@@ -101,10 +107,6 @@ class CodeRyplMenuBar(QMenuBar):
             "Redo",
             lambda: blocking_popup("Redo not implemented"),
             "Ctrl+Shift+Z",
-        )
-        edit_menu.addAction(
-            "About",
-            lambda: blocking_popup("About not implemented, but Hi! I'm software."),
         )
         edit_menu.addSeparator()
         # remove empty lines
