@@ -75,6 +75,12 @@ class CodeRyplMenuBar(QMenuBar):
 
         self._setup_file_menu()
         self._setup_edit_menu()
+        self._setup_about_dialog()
+
+    def _setup_about_dialog(self) -> None:
+        # add an about dialog
+        about = self.addMenu("About")
+        about.addAction("About", lambda: blocking_popup("About not implemented"))
 
     def _setup_file_menu(self) -> None:
         self.file_menu = file_menu = self.addMenu("File")
@@ -101,10 +107,6 @@ class CodeRyplMenuBar(QMenuBar):
             "Redo",
             lambda: blocking_popup("Redo not implemented"),
             "Ctrl+Shift+Z",
-        )
-        edit_menu.addAction(
-            "About",
-            lambda: blocking_popup("About not implemented, but Hi! I'm software."),
         )
         edit_menu.addSeparator()
         # remove empty lines
@@ -214,6 +216,7 @@ class CodeRyplDocumentWindow(QMainWindow):
                 suggested_filename = self._resolve_suggested_filename(
                     ChosenRenderer(**self.model.meta_as_dict()), "SameAs"
                 )
+                print(suggested_filename)
             except Exception as err:
                 print(f"Error resolving suggested filename: {err}")
                 suggested_filename = "SaveAs"
@@ -265,7 +268,11 @@ class CodeRyplDocumentWindow(QMainWindow):
             return False
 
     def _check_for_save_on_close(self) -> bool:
-        if self.model.changed():
+        if not self.model.changed() or (
+            self.model.isempty() and self.model.filename is None
+        ):
+            return True
+        else:
             # make a popup to ask if they want to save
             popup = QMessageBox(self)
             popup.setText("Save changes before closing?")
@@ -276,6 +283,7 @@ class CodeRyplDocumentWindow(QMainWindow):
             popup.setWindowTitle("Unsaved Changes")
             popup.setIcon(QMessageBox.Warning)
             choice = popup.exec()
+
             # if they choose to save, save
             if choice == QMessageBox.Save:
                 self.save()
@@ -283,7 +291,9 @@ class CodeRyplDocumentWindow(QMainWindow):
             elif choice == QMessageBox.Cancel:
                 print("cancel")
                 return False
-            else:
+            else:  # QMessageBox.Discard
+                print(f"{choice=}, {QMessageBox.Discard=}, {int(QMessageBox.Discard)=}")
+
                 double_check = QMessageBox(self)
                 double_check.setText(
                     "Are you sure you want to quit and discard all changes?"
