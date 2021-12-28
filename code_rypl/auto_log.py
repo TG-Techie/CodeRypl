@@ -22,7 +22,11 @@ if hasattr(sys, "_getframe") and build_mode != BuildMode.release:
 
         modname = outer.f_globals.get("__name__", None)
         # f"[{modinfo}]" if modinfo is not None else "[?unknown]"
-        if modname is not None and modname != _last_moule_name:
+        if (
+            modname.startswith("code_rypl")
+            and modname is not None
+            and modname != _last_moule_name
+        ):
             _last_moule_name = modname
             _orig_print(f"@[module: {modname}]")
         elif modname is None:
