@@ -8,8 +8,10 @@ import datetime
 import tempfile
 from typing import *
 
+from .versioning import BuildMode, __build_mode__ as build_mode
+
 # if the sys._getframe api is available inject statements into print indicating the module
-if hasattr(sys, "_getframe"):
+if hasattr(sys, "_getframe") and build_mode != BuildMode.release:
     _orig_print = builtins.print
 
     _last_moule_name: None | str = None
