@@ -77,7 +77,8 @@ print(f"{sys.executable=!r}")
 print(f"{sys.argv=!r}")
 
 print(
-    f"logging stderr to: {tmperr.name!r}, "
-    f"stdout to: {tmpout.name!r}, "
-    f"both to: {tmplog.name!r}"
+    "logging:\n"
+    f"\tstderr to: {tmperr.name!r}\n"
+    f"\tstdout to: {tmpout.name!r}\n"
+    f"\tboth to: {tmplog.name!r}"
 )

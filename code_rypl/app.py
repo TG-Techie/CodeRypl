@@ -9,7 +9,12 @@ from . import auto_log
 
 from .document import CodeRyplDocumentWindow
 
+import PySide6
 from PySide6.QtWidgets import QApplication
+
+print(f"using PySide version {PySide6.__version__}")
+
+# get the current app version
 
 
 class CodeRyplApplication(QApplication):
