@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 
 from .renderers import tools as renderer_tools
 from .model import Player, Coach
-from .table import ColumnCompleterDelegate
+from .table import CoachItemDelegate
 
 
 UNSAVED_UI_CHECK_INTERVAL = 1000  # milliseconds
@@ -424,7 +424,7 @@ class CodeRyplDocumentWindow(QMainWindow):
         )
         self.coach_table = coach_table = RplmTableView(
             Coach.num_cols(),
-            cols_with_completion={2: ColumnCompleterDelegate},
+            cols_with_completion={2: CoachItemDelegate},
             num_opt_cols=0,
         )
 
