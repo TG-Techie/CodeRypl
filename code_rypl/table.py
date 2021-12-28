@@ -32,7 +32,7 @@ ENABLE_MOVE_TO_FIRST_ON_INSERT = not (
 
 
 class ColumnItemDeleagate(QStyledItemDelegate):
-    def __init__(self, table: QTableView, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, table: RplmTableView, *args: Any, **kwargs: Any) -> None:
         self._table = table
         return super().__init__(table, *args, **kwargs)
 
@@ -52,41 +52,39 @@ class ColumnCompleter(QCompleter):
         # self.setFilterMode(Qt.MatchContains)
         # self.setCompletionMode(QCompleter.PopupCompletion)
 
-    # TODOL when there is on suggestion switch to inline suggestions
-    # def adjust_mode(self, *args) -> None:
-    #     print("adjusting mode", *args)
-    #     completions = self._completions
-    #     if len(completions) == 1:
-    #         self.setFilterMode(Qt.MatchStartsWith)
-    #         self.setCompletionMode(QCompleter.InlineCompletion)
-    #     else:
-    #         self.setFilterMode(Qt.MatchContains)
-    #         self.setCompletionMode(QCompleter.PopupCompletion)
-
 
 class ColumnCompleterDelegate(ColumnItemDeleagate):
+    preloaded: ClassVar[set[str]] = set()
+
     def createEditor(self, parent, option, index):
 
         self.editor = editor = QLineEdit(parent)
 
         editor.installEventFilter(self._table)
 
-        completionlist = self._table._rplm_list.get_col_set(index.column())
+        completions = (
+            self._table._rplm_list.get_col_set(index.column(), excluding=(index.row(),))
+            | self.preloaded
+            | {" "}
+        )
 
-        completer = ColumnCompleter(completionlist, parent)
-
+        completer = ColumnCompleter(completions, parent)
         editor.setCompleter(completer)
+
         return editor
 
 
-# class CoachItemDelegate(ColumnCompleterDelegate):
-#     def createEditor(self, parent, option, index):
-#         # TODO: make abreviations to the coach names and expand to the full entry
-#         editor = super().createEditor(parent, option, index)
-#         editor.editingFinished.connect(
-#             lambda: editor.setText((editor.text()))
-#         )
-#         return editor
+class CoachItemDelegate(ColumnCompleterDelegate):
+    preloaded = {
+        "Head Coach",
+        "assistant Coach",
+        "associate Coach",
+        "assistant head coach",
+        "associate head coach",
+        "athletic trainer",
+        "goalie coach",
+        "strength and conditioning coach",
+    }
 
 
 class RplmTableView(QTableView):
