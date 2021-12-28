@@ -1,12 +1,16 @@
+#!/bin/bash
 
-# check if pyinstaller is installed
-pip show pyinstaller
-if [ $? -eq 1 ]; then
-    pip install pyinstaller
-fi
+# make build-time version of the source
+rm -rf build
+mkdir build
+cp -r code_rypl/ build/code_rypl_build/
 
+# freeze the version info
+python3 build/code_rypl_build/versioning.py --pre-process-in-place
+
+# package the source
 pyinstaller --noconfirm\
     --windowed\
     --name=CodeRypl\
-    code_rypl/__main__.py
+    build/code_rypl_build/__main__.py
     # --icon=icon.ico\

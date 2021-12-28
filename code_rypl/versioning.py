@@ -128,13 +128,13 @@ if __name__ == "__main__":
             f'__build_date__: Literal["{__build_date__}"] = "{__build_date__}"\n',
             
             '__build_time__: str = ""\n':
-            f'__build_time__: Final[str] = "{__build_time__}"\n',
+            f'__build_time__: Literal["{__build_time__}"] = "{__build_time__}"\n',
             
             '__build_platform__: str = ""\n':
             f'__build_platform__: Literal["{__build_platform__}"] = "{__build_platform__}"\n',
 
             '__python_build_version__: str = ""\n':
-            f'__python_build_version__: Literal["{__python_build_version__}"] = "{__python_build_version__}"\n',
+            f'__python_build_version__: Final[str] = "{__python_build_version__}"\n',
 
             "__pre_processed__: bool = False\n":
             "__pre_processed__: Literal[True] = True\n",
