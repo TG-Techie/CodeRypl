@@ -3,42 +3,60 @@ Intercepts write() calls to stdout and stderr and logs them to the temp dir
 """
 
 from os import path
+from re import escape
 import sys
 import datetime
 import tempfile
 from typing import *
 
 
-def patch_in_second(*, fromstd: TextIO, tofile: TextIO) -> None:
+def patch_in_second(*, fromstd: TextIO, tofiles: TextIO | Iterable[TextIO]) -> None:
+    """
+    wrap key methods used by print/etc to also write output to a file in addition to stdout|stderr
+    """
 
+    # normalize to and sanitize input
+    if isinstance(tofiles, TextIO):
+        tofiles = (tofiles,)
+    else:
+        tofiles = tuple(tofiles)
+
+    # keep a local closure of the original methods
     fromstd_flush = fromstd.flush
     fromstd_seek = fromstd.seek
     fromstd_truncate = fromstd.truncate
     fromstd_write = fromstd.write
     fromstd_writelines = fromstd.writelines
 
+    # wrapper for the original methods
     def flush() -> None:
         fromstd_flush()
-        tofile.flush()
+        for file in tofiles:
+            file.flush()
 
     def seek(offset: int, whence: int = 0) -> int:
         ret = fromstd_seek(offset, whence)
-        tofile.seek(offset, whence)
+        for file in tofiles:
+            file.seek(offset, whence)
         return ret
 
     def truncate(size: int = None) -> int:
         ret = fromstd_truncate(size)
-        tofile.truncate(size)
+        for file in tofiles:
+            file.truncate(size)
         return ret
 
     def write(s: AnyStr) -> int:
         ret = fromstd_write(s)
-        tofile.write(s)
+        for file in tofiles:
+            file.write(s)
         return ret
 
-    def writelines(lines: List[AnyStr]) -> None:
+    def writelines(lines: Iterable[AnyStr]) -> None:
+        lines = list(lines)
         fromstd_writelines(lines)
-        tofile.writelines(lines)
+        for file in tofiles:
+            file.writelines(lines)
 
     fromstd.flush = flush
     fromstd.seek = seek
