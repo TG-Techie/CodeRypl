@@ -377,9 +377,12 @@ class RplmList(Generic[R], QAbstractTableModel):
         self,
         data: Iterable[R],
         set_selected_cell: Callable[[QModelIndex], None] = None,
-        normalizers: dict[int, Callable[[str], str]] = {},
+        normalizers: dict[int, Callable[[str], str]] | None = None,
     ):
         super().__init__()
+
+        # input sanitization
+        normalizers = {} if normalizers is None else normalizers
 
         self._data = list(data)
         assert len(self._data) > 0, f"cannot create an empty RplmList"

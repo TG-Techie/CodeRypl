@@ -75,6 +75,12 @@ class CodeRyplMenuBar(QMenuBar):
 
         self._setup_file_menu()
         self._setup_edit_menu()
+        self._setup_about_dialog()
+
+    def _setup_about_dialog(self) -> None:
+        # add an about dialog
+        about = self.addMenu("About")
+        about.addAction("About", lambda: blocking_popup("About not implemented"))
 
     def _setup_file_menu(self) -> None:
         self.file_menu = file_menu = self.addMenu("File")
@@ -91,7 +97,8 @@ class CodeRyplMenuBar(QMenuBar):
 
     def _setup_edit_menu(self) -> None:
         edit_menu = self.addMenu("Edit")
-        # TODO: consider hwo to add this... maybe!? (pribs need to integrate with RplmList)
+
+        # TODO: consider how to add this... maybe!? (probs need to integrate with RplmList)
         # edit_menu.addAction(
         #     "Undo",
         #     lambda: blocking_popup("Undo not implemented"),
@@ -102,15 +109,11 @@ class CodeRyplMenuBar(QMenuBar):
         #     lambda: blocking_popup("Redo not implemented"),
         #     "Ctrl+Shift+Z",
         # )
-        edit_menu.addAction(
-            "About",
-            lambda: blocking_popup("About not implemented, but Hi! I'm software."),
-        )
-        edit_menu.addSeparator()
+        
         # remove empty lines
         edit_menu.addAction(
             "Delete Line",
-            # lamdbd so self is captured and not bound to the model item
+            # lambda so self is captured and not bound to the model item
             lambda: None
             if (table := self.doc.get_focused_table()) is None
             else table.remove_selected_row(),
@@ -122,7 +125,7 @@ class CodeRyplMenuBar(QMenuBar):
             self, "Open File", str(self.doc._last_export_path), "RPLM Files (*.rplm)"
         )
 
-        # TODO: add a proper check to see if the file is already open, using app. swithc focus
+        # TODO: add a proper check to see if the file is already open, using app. switch focus
 
         if filename in (
             (other_doc := d).model.filename for d in self.doc.app._documents
@@ -214,6 +217,7 @@ class CodeRyplDocumentWindow(QMainWindow):
                 suggested_filename = self._resolve_suggested_filename(
                     ChosenRenderer(**self.model.meta_as_dict()), "SameAs"
                 )
+                print(suggested_filename)
             except Exception as err:
                 print(f"Error resolving suggested filename: {err}")
                 suggested_filename = "SaveAs"
@@ -265,7 +269,11 @@ class CodeRyplDocumentWindow(QMainWindow):
             return False
 
     def _check_for_save_on_close(self) -> bool:
-        if self.model.changed():
+        if not self.model.changed() or (
+            self.model.isempty() and self.model.filename is None
+        ):
+            return True
+        else:
             # make a popup to ask if they want to save
             popup = QMessageBox(self)
             popup.setText("Save changes before closing?")
@@ -276,6 +284,7 @@ class CodeRyplDocumentWindow(QMainWindow):
             popup.setWindowTitle("Unsaved Changes")
             popup.setIcon(QMessageBox.Warning)
             choice = popup.exec()
+
             # if they choose to save, save
             if choice == QMessageBox.Save:
                 self.save()
@@ -283,7 +292,9 @@ class CodeRyplDocumentWindow(QMainWindow):
             elif choice == QMessageBox.Cancel:
                 print("cancel")
                 return False
-            else:
+            else:  # QMessageBox.Discard
+                print(f"{choice=}, {QMessageBox.Discard=}, {int(QMessageBox.Discard)=}")
+
                 double_check = QMessageBox(self)
                 double_check.setText(
                     "Are you sure you want to quit and discard all changes?"
