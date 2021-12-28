@@ -10,6 +10,8 @@ test script:
 ```
 """
 
+# TODO: add in CLI arg for the release number (canonicalized)
+
 
 import sys
 import datetime
