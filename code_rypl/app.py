@@ -4,6 +4,9 @@ from typing import *
 
 import sys
 
+from . import auto_log
+
+
 from .document import CodeRyplDocumentWindow
 
 from PySide6.QtWidgets import QApplication
