@@ -32,7 +32,7 @@ ENABLE_MOVE_TO_FIRST_ON_INSERT = not (
 
 
 class ColumnItemDeleagate(QStyledItemDelegate):
-    def __init__(self, table: QTableView, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, table: RplmTableView, *args: Any, **kwargs: Any) -> None:
         self._table = table
         return super().__init__(table, *args, **kwargs)
 
@@ -48,9 +48,9 @@ class ColumnCompleter(QCompleter):
         self.setCaseSensitivity(Qt.CaseInsensitive)
 
         self.setFilterMode(Qt.MatchStartsWith)
-        # self.setCompletionMode(QCompleter.InlineCompletion)
+        self.setCompletionMode(QCompleter.InlineCompletion)
         # self.setFilterMode(Qt.MatchContains)
-        self.setCompletionMode(QCompleter.PopupCompletion)
+        # self.setCompletionMode(QCompleter.PopupCompletion)
 
 
 class ColumnCompleterDelegate(ColumnItemDeleagate):
@@ -63,12 +63,14 @@ class ColumnCompleterDelegate(ColumnItemDeleagate):
         editor.installEventFilter(self._table)
 
         completions = (
-            self._table._rplm_list.get_col_set(index.column()) | self.preloaded
+            self._table._rplm_list.get_col_set(index.column(), excluding=(index.row(),))
+            | self.preloaded
+            | {" "}
         )
 
         completer = ColumnCompleter(completions, parent)
-
         editor.setCompleter(completer)
+
         return editor
 
 

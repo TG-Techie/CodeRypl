@@ -424,8 +424,12 @@ class RplmList(Generic[R], QAbstractTableModel):
     def current_rplm(self) -> R:
         return self._data[self._last_used_index.row()]
 
-    def get_col_set(self, col: int) -> Set[str]:
-        return {rplm.get_col(col) for rplm in self._data if not rplm.isempty()}
+    def get_col_set(self, col: int, *, excluding: Container[int] = ()) -> Set[str]:
+        return {
+            rplm.get_col(col)
+            for row, rplm in enumerate(self._data)
+            if row not in excluding and not rplm.isempty()
+        }
 
     def get_rplm_field(self, row: int, col: int) -> str:
         return self._data[row].get_col(col)
