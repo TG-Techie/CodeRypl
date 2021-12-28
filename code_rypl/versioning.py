@@ -64,8 +64,8 @@ if not __pre_processed__:
 
     __build_date__ = now.strftime("%d%b%Y")
     __build_time__ = now.strftime("%Hh%Mm%Ss")
-    __build_platform__: str = sys.platform
-    __python_build_version__: str = sys.version
+    __build_platform__: str = sys.platform  # type: ignore[no-redef]
+    __python_build_version__: str = sys.version  # type: ignore[no-redef]
 
     assert __branch_name__ == ""
     assert __build_mode__ is None
@@ -159,7 +159,7 @@ if __name__ == "__main__":
                 ):
                     # skip the next indentation level
                     file.write(f"# {line}")
-                    next_line = next(itrbl)
+                    next_line: None | str = next(itrbl)
                     while next_line is not None and (
                         next_line.startswith(" ")
                         or next_line.startswith("\n")
