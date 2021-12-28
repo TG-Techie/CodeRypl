@@ -36,6 +36,7 @@ jobs:
           --pre-process-in-place \
           --bulid-mode=release
       # TODO: later add --releease=1307 # etc 
+      # test push: 1
     
     - uses: ncipollo/release-action@v1
       with:
