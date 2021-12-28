@@ -4,9 +4,9 @@ This file may be pre-processed by the build system.
 
 test script:
 ```bash
-    rm -rf build/code_rypl_build \
-    && cp -r code_rypl build/code_rypl_build\
-    && py build/code_rypl_build/versioning.py --pre-process-in-place
+    rm -rf build/code_rypl \
+    && cp -r code_rypl build/code_rypl\
+    && py build/code_rypl/versioning.py --pre-process-in-place
 ```
 """
 
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     else:
 
         print(f"adding version and build info with pre-processing to {__file__!r}")
-        assert __file__.endswith("build/code_rypl_build/versioning.py"), (
+        assert __file__.endswith("build/code_rypl/versioning.py"), (
             "code_rypl must be copied to to a 'build/' directory to "
             f"be pre-processed, in {__file__}"
         )
