@@ -22,26 +22,26 @@ if hasattr(sys, "_getframe"):
         # f"[{modinfo}]" if modinfo is not None else "[?unknown]"
         if modname is not None and modname != _last_moule_name:
             _last_moule_name = modname
-            _orig_print(f"@[in: {modname}]")
+            _orig_print(f"@[module: {modname}]")
         elif modname is None:
             _last_moule_name = None
-            _orig_print("@[in: ?unknown]")
+            _orig_print("@[module: ?unknown]")
 
         _orig_print(*args, **kwargs)
 
     builtins.print = _moduled_print
 
 
-def mirror_written(*, fromstd: TextIO, tofiles: tuple[TextIO, ...]) -> None:
+def instrument_logging(fromstd: TextIO, *, into: tuple[TextIO, ...]) -> None:
     """
     wrap key methods used by print/etc to also write output to a file in addition to stdout|stderr
     """
 
     # normalize to and sanitize input
-    if isinstance(tofiles, TextIO):
-        tofiles = (tofiles,)
+    if isinstance(into, TextIO):
+        into = (into,)
     else:
-        tofiles = tuple(tofiles)
+        into = tuple(into)
 
     # keep a local closure of the original methods
     fromstd_flush = fromstd.flush
@@ -53,31 +53,31 @@ def mirror_written(*, fromstd: TextIO, tofiles: tuple[TextIO, ...]) -> None:
     # wrapper for the original methods
     def flush() -> None:
         fromstd_flush()
-        for file in tofiles:
+        for file in into:
             file.flush()
 
     def seek(offset: int, whence: int = 0) -> int:
         ret = fromstd_seek(offset, whence)
-        for file in tofiles:
+        for file in into:
             file.seek(offset, whence)
         return ret
 
     def truncate(size: int = None) -> int:
         ret = fromstd_truncate(size)
-        for file in tofiles:
+        for file in into:
             file.truncate(size)
         return ret
 
-    def write(s: AnyStr) -> int:
+    def write(s) -> int:
         ret = fromstd_write(s)
-        for file in tofiles:
+        for file in into:
             file.write(s)
         return ret
 
-    def writelines(lines: Iterable[AnyStr]) -> None:
+    def writelines(lines) -> None:
         lines = list(lines)
         fromstd_writelines(lines)
-        for file in tofiles:
+        for file in into:
             file.writelines(lines)
 
     fromstd.flush = flush  # type: ignore[assignment]
@@ -101,8 +101,8 @@ tmpout = open(_tmpout_name, "w")
 tmplog = open(_tmplog_name, "w")
 
 # the individual styles
-mirror_written(fromstd=sys.stderr, tofiles=(tmperr, tmplog))
-mirror_written(fromstd=sys.stdout, tofiles=(tmpout, tmplog))
+instrument_logging(sys.stderr, into=(tmperr, tmplog))
+instrument_logging(sys.stdout, into=(tmpout, tmplog))
 
 
 # # and output
