@@ -4,7 +4,7 @@ name: auto-build
 
 on: 
   push:
-    branches: [ auto-build, main ]
+    branches: [ main, release-v*]
 
 jobs:
   auto-build:
@@ -70,8 +70,8 @@ jobs:
           .app.zip"
         artifactContentType: "application/zip"
         allowUpdates: true
-        name: "Auto Build"
-        tag: auto-build
+        name: "Auto Build ${{ steps.build-info.outputs.branch_name }}"
+        tag: auto-build-${{ steps.build-info.outputs.branch_name }}
         prerelease: True
         omitBody: true
         token: ${{ secrets.GITHUB_TOKEN }}
