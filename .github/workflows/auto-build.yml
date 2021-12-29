@@ -1,0 +1,77 @@
+name: auto-build
+
+# TODO: look into multi-platofrm builds
+
+on: 
+  push:
+    branches: [ main, release-v*]
+
+jobs:
+  auto-build:
+    runs-on: macos-10.15
+    
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+        cache: pip
+    
+    - name: Install dependencies
+      run: |
+        echo python-version $(python --version)
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Generate build-info
+      id: build-info
+      shell: bash
+      run: |
+        echo "::set-output name=time_stamp::$(date +%d%b%Y-%Hh%Mm%Ss)"
+        echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+        echo "::set-output name=branch_name::$(git rev-parse --abbrev-ref HEAD)"
+      # git fetch origin --tags >> /dev/null
+      # echo "::set-output name=auto_build_no::$(git tag --list | grep -c auto-build-)"
+      
+    - name: Setup build
+      run: |
+        mkdir build
+        cp -r code_rypl/ build/code_rypl/
+        python3 build/code_rypl/versioning.py \
+          --pre-process-in-place \
+          --bulid-mode=release
+    
+    - name: Run build (package app)
+      run: |
+        pyinstaller --noconfirm \
+          --windowed \
+          --name=CodeRypl \
+          build/code_rypl/__main__.py
+    
+    - name: Compress package
+      run: 
+        "zip -r   \
+        CodeRypl\
+          -${{ steps.build-info.outputs.branch_name }}\
+          -${{ steps.build-info.outputs.time_stamp }}\
+          -${{ steps.build-info.outputs.sha_short }}\
+          .app.zip   \
+        dist/CodeRypl.app"
+    
+    # next commit
+    - uses: ncipollo/release-action@v1
+      with:
+        artifacts:
+          "CodeRypl\
+          -${{ steps.build-info.outputs.branch_name }}\
+          -${{ steps.build-info.outputs.time_stamp }}\
+          -${{ steps.build-info.outputs.sha_short }}\
+          .app.zip"
+        artifactContentType: "application/zip"
+        allowUpdates: true
+        name: "Auto Build ${{ steps.build-info.outputs.branch_name }}"
+        tag: auto-build-${{ steps.build-info.outputs.branch_name }}
+        prerelease: True
+        omitBody: true
+        token: ${{ secrets.GITHUB_TOKEN }}

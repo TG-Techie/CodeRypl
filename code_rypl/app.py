@@ -4,9 +4,20 @@ from typing import *
 
 import sys
 
+from . import auto_log
+from . import versioning
+
+
 from .document import CodeRyplDocumentWindow
 
+import PySide6
 from PySide6.QtWidgets import QApplication
+
+print(f"using PySide version {PySide6.__version__}")
+print("--- CodeRypl version info ---")
+print(versioning.full_version())
+
+# get the current app version
 
 
 class CodeRyplApplication(QApplication):
