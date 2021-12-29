@@ -4,7 +4,7 @@ name: auto-build
 
 on: 
   push:
-    branches: [ main ]
+    branches: [ auto-build, main ]
 
 jobs:
   auto-build:
