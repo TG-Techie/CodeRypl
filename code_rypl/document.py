@@ -157,7 +157,7 @@ class CodeRyplDocumentWindow(QMainWindow):
 
         self.app = app
 
-        self.setSize(720, 450)
+        self.resize(720, 450)
 
         self.menu_bar = menu_bar = CodeRyplMenuBar(self)
         self.setMenuBar(menu_bar)
