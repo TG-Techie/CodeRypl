@@ -97,22 +97,23 @@ class CodeRyplMenuBar(QMenuBar):
 
     def _setup_edit_menu(self) -> None:
         edit_menu = self.addMenu("Edit")
-        # todo: add undo/redo
-        edit_menu.addAction(
-            "Undo",
-            lambda: blocking_popup("Undo not implemented"),
-            "Ctrl+Z",
-        )
-        edit_menu.addAction(
-            "Redo",
-            lambda: blocking_popup("Redo not implemented"),
-            "Ctrl+Shift+Z",
-        )
-        edit_menu.addSeparator()
+
+        # TODO: consider how to add this... maybe!? (probs need to integrate with RplmList)
+        # edit_menu.addAction(
+        #     "Undo",
+        #     lambda: blocking_popup("Undo not implemented"),
+        #     "Ctrl+Z",
+        # )
+        # edit_menu.addAction(
+        #     "Redo",
+        #     lambda: blocking_popup("Redo not implemented"),
+        #     "Ctrl+Shift+Z",
+        # )
+        
         # remove empty lines
         edit_menu.addAction(
             "Delete Line",
-            # lamdbd so self is captured and not bound to the model item
+            # lambda so self is captured and not bound to the model item
             lambda: None
             if (table := self.doc.get_focused_table()) is None
             else table.remove_selected_row(),
@@ -124,7 +125,7 @@ class CodeRyplMenuBar(QMenuBar):
             self, "Open File", str(self.doc._last_export_path), "RPLM Files (*.rplm)"
         )
 
-        # TODO: add a proper check to see if the file is already open, using app. swithc focus
+        # TODO: add a proper check to see if the file is already open, using app. switch focus
 
         if filename in (
             (other_doc := d).model.filename for d in self.doc.app._documents
