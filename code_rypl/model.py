@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import time
+import functools
+import inspect
 
 from typing import *
 from typing import TextIO, BinaryIO
@@ -33,6 +35,44 @@ def blocking_popup(message):
     msgbox.setText(message)
     msgbox.exec()
 
+
+def dialog_on_error(fn: Callable) -> Callable:
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as err:
+            blocking_popup(f"{type(err).__name__}\n{err}")
+            raise err
+
+    return wrapper
+
+
+if TYPE_CHECKING:
+    dialog_on_error = lambda fn: fn
+
+
+def instrumented(fn: Callable) -> Callable:
+    signature = inspect.signature(fn)
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        params = ",\n\t".join(
+            map(
+                lambda s: "{}={}".format(*s),
+                signature.bind(*args, **kwargs).arguments.items(),
+            )
+        )
+        print(f"{fn.__name__}(\n\t{params}\n)")
+        ret = fn(*args, **kwargs)
+        print(f"{fn.__name__} returned {ret}")
+        return ret
+
+    return wrapper
+
+
+if TYPE_CHECKING:
+    instrumented = lambda fn: fn
 
 R = TypeVar("R", bound="Rplm")
 
@@ -523,51 +563,141 @@ class RplmList(Generic[R], QAbstractTableModel):
             | Qt.ItemIsDropEnabled
         )
 
-    def mimeData(self, indicies: list[QModelIndex]) -> QMimeData:  # type: ignore
-        self._drop_sources = indicies
-
-        if len(indicies) != 1:
-            blocking_popup(
-                f"Can only drag one item at a time, not {len(indicies)}.\n"
-                "(If you're Ryan reading this message, what would that even do?)"
-            )
-
-        data = super().mimeData(indicies)  # type: ignore
-
-        data.setData(
-            "application/rplm-row",
-            QByteArray((str(indicies[0].row())).encode()),
-        )
-        data.setData(
-            "application/rplm-col",
-            QByteArray((str(indicies[0].column())).encode()),
-        )
+    @instrumented
+    def mimeData(self, indicies: list[QModelIndex]) -> QMimeData:
+        self._last_drop_sources = indicies
+        data = super().mimeData(indicies)
+        data.setData("application/rplm-drop-pack", generate_dropdata(indicies))
         return data
 
-    def dropMimeData(self, data: QMimeData, action, _r, _c, parent):
+    @dialog_on_error
+    @instrumented
+    def dropMimeData(self, data: QMimeData, action, _r, _c, parent) -> bool:
 
-        if action == Qt.CopyAction:
-            dest_pos = (parent.row(), parent.column())
-            src_pos = (
-                int(data.data("application/rplm-row")),
-                int(data.data("application/rplm-col")),
-            )
-
-            # swap the fields
-            src_value = self.get_rplm_field(*src_pos)
-            dest_value = self.get_rplm_field(*dest_pos)
-
-            self.set_rplm_field(*dest_pos, src_value)
-            self.set_rplm_field(*src_pos, dest_value)
-
-            # update the table
-            self.refresh()
-
-            # keep focus on the dragged item (feels a bit more natural)
-            self.set_selected_cell(parent)
-        else:
+        if action != Qt.CopyAction:
             raise RuntimeError(
                 f"unknown drop action {action} in {type(self).__name__}.dropMimeData"
             )
 
+        (
+            src_first_row,
+            src_last_row,
+            src_first_col,
+            src_last_col,
+        ) = parse_dropdata(data.data("application/rplm-drop-pack"))
+
+        dest_row, dest_col = parent.row(), parent.column()
+
+        # --- check for valid drop target ---
+        if dest_row > src_first_row:
+            diff = dest_row - src_first_row
+            assert src_last_row + diff <= len(self) - 1, (
+                f"dragged row out of range, "
+                "cannot drop data off the bottom of the table"
+            )
+
+        if dest_col > src_first_col:
+
+            diff = dest_col - src_first_col
+            assert src_last_col + diff <= self._data_type.num_cols() - 1, (
+                f"dragged data out of bounds, "
+                "cannot drop data off the side of the table"
+            )
+
+        # --- check for drop within source ---
+        # num_rows = src_last_row - src_first_row + 1
+        # if src_first_row != src_last_row:  # more then one row
+        #     assert set() == (
+        #         (fromrows := set(range(src_first_row, src_last_row + 1)))
+        #         & (torows := set(range(dest_row, dest_row + num_rows)))
+        #     ), f"cannot drop data onto itself, rows {fromrows} & {torows} = {fromrows & torows}, {fromrows & torows == set()}"
+        # if src_first_col != src_last_col:  # more then one col
+        #     assert set() == (
+        #         (fromcols := set(range(src_first_col, src_last_col + 1)))
+        #         & (tocols := set(range(dest_col, dest_col + num_rows)))
+        #     ), f"cannot drop data onto itself, cols {fromcols} & {tocols} = {fromcols & tocols}, {fromcols & tocols == set()}"
+
+        # enumerate the indiices taht need to be swapped
+        pairs_to_swap = [
+            ((rsrc, csrc), (dest_row + roff, dest_col + coff))
+            for roff, rsrc in enumerate(range(src_first_row, src_last_row + 1))
+            for coff, csrc in enumerate(range(src_first_col, src_last_col + 1))
+        ]
+
+        # check dat source and dest do not overlap
+        assert 0 == len(
+            overlap := set(map(lambda p: p[0], pairs_to_swap))
+            & set(map(lambda p: p[1], pairs_to_swap))
+        ), f"cannot drop data onto itself,\n({overlap})"
+
+        # sotre the field values locally
+        pairs = [
+            (self.get_rplm_field(*src), self.get_rplm_field(*dest))
+            for src, dest in pairs_to_swap
+        ]
+
+        for (src, dest), (src_value, dest_value) in zip(pairs_to_swap, pairs):
+            self.set_rplm_field(*dest, src_value)
+            self.set_rplm_field(*src, dest_value)
+
+        # update the table
+        self.refresh()
+
+        # # keep focus on the dragged item (feels a bit more natural)
+        # self.set_selected_cell(parent)
+
         return True
+
+
+@dialog_on_error
+def generate_dropdata(indicies: Iterable[QModelIndex]) -> bytes:
+
+    indicies = tuple(indicies)
+
+    # check coninuity
+    rows = {i.row() for i in indicies}
+    cols = {i.column() for i in indicies}
+    found_pairs = {(i.row(), i.column()) for i in indicies}
+
+    if len(cols) == 1:
+        assert (rows) == set(
+            range(min(rows), max(rows) + 1)
+        ), f"cannot drag non-contiguous rows: {rows}"
+    elif len(rows) == 1:
+        assert (cols) == set(
+            range(min(cols), max(cols) + 1)
+        ), f"cannot drag non-contiguous cols: {cols}"
+    else:
+        required_pairs = set(
+            (r, c)
+            for r in range(min(rows), max(rows) + 1)
+            for c in range(min(cols), max(cols) + 1)
+        )
+        assert (
+            required_pairs == found_pairs
+        ), f"cannot drag non-filled block. missing (row, col) {required_pairs - found_pairs}"
+
+    return msgpack.packb(
+        dict(
+            first_row=min(rows),
+            last_row=max(rows),
+            first_col=min(cols),
+            last_col=max(cols),
+        )
+    )
+
+
+@dialog_on_error
+def parse_dropdata(data: bytes) -> tuple[int, int, int, int]:
+    data = msgpack.unpackb(data)
+    assert isinstance(data, dict), f"Internal error: invalid drop data: {data}"
+    assert "first_row" in data, f"Internal error: drop data missing first_row: {data}"
+    assert "last_row" in data, f"Internal error: drop data missing last_row: {data}"
+    assert "first_col" in data, f"Internal error: drop data missing first_col: {data}"
+    assert "last_col" in data, f"Internal error: drop data missing last_col: {data}"
+    return (
+        data["first_row"],
+        data["last_row"],
+        data["first_col"],
+        data["last_col"],
+    )
